@@ -77,6 +77,13 @@ namespace emote {
 
         void draw(tTJSVariant layer) {}
 
+        // TODO
+        void startWind(tjs_real start, tjs_real goal, tjs_real speed, tjs_real powMin, tjs_real powMax){  }
+        void stopWind() {}
+
+        void setVariable(tTJSString name, tjs_real value);
+        tjs_real getVariable(tTJSString name);
+
         tTJSVariant getTimelineLabelList(const std::function<bool(int)> &diffFilter) const;
 
         tTJSVariant getDiffTimelineLabelList() const;

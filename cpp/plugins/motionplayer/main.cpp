@@ -9,7 +9,6 @@
 
 #include "ResourceManager.h"
 #include "EmotePlayer.h"
-#include "Player.h"
 #include "SeparateLayerAdaptor.h"
 
 using namespace emote;
@@ -28,8 +27,6 @@ NCB_TYPECONV_CAST_INTEGER(EmotePlayer::TimelinePlayFlagsType);
 
 NCB_REGISTER_SUBCLASS_DELAY(SeparateLayerAdaptor) { NCB_CONSTRUCTOR(()); }
 
-NCB_REGISTER_SUBCLASS_DELAY(Player) { NCB_CONSTRUCTOR(()); }
-
 NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer) {
     Variant("TimelinePlayFlagParallel",
             EmotePlayer::TimelinePlayFlagsType::Parallel);
@@ -46,9 +43,10 @@ NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer) {
     NCB_METHOD(draw);
     // progress(tjs_int tickStep)
     // frameProgress
-    // startWind
-    // stopWind
-    // setVariable getVariable
+    NCB_METHOD(startWind);
+    NCB_METHOD(stopWind);
+    NCB_METHOD(setVariable);
+    NCB_METHOD(getVariable);
     // setCoord
     // setScale
     // setRotate
@@ -190,7 +188,7 @@ NCB_REGISTER_CLASS(Motion) {
     // SourceCache
     // ObjSource
     NCB_SUBCLASS(ResourceManager, ResourceManager);
-    NCB_SUBCLASS(Player, Player);
+    NCB_SUBCLASS(Player, EmotePlayer);
     NCB_SUBCLASS(EmotePlayer, EmotePlayer);
     NCB_SUBCLASS(SeparateLayerAdaptor, SeparateLayerAdaptor);
 }
