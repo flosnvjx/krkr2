@@ -12,6 +12,7 @@
 #include "PSBFile.h"
 #include "PSBHeader.h"
 #include "PSBMedia.h"
+#include "PSBMediaRegistry.h"
 #include "PSBValue.h"
 
 #define NCB_MODULE_NAME TJS_W("psbfile.dll")
@@ -21,19 +22,9 @@
 using namespace PSB;
 static PSBMedia *psbMedia = nullptr;
 
-void initPsbFile() {
-    psbMedia = new PSBMedia();
-    TVPRegisterStorageMedia(psbMedia);
-    psbMedia->Release();
-    LOGGER->info("initPsbFile");
-}
+void initPsbFile() { initPSBMedia(); }
 
-void deInitPsbFile() {
-    if(psbMedia != nullptr) {
-        TVPUnregisterStorageMedia(psbMedia);
-    }
-    LOGGER->info("deInitPsbFile");
-}
+void deInitPsbFile() { deInitPSBMedia(); }
 
 static tjs_error getRoot(tTJSVariant *r, tjs_int n, tTJSVariant **p,
                          iTJSDispatch2 *obj) {

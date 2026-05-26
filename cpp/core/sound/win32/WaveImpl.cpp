@@ -1813,8 +1813,8 @@ tTVPWaveSoundBufferDecodeThread::~tTVPWaveSoundBufferDecodeThread() {
     SetPriority(TVPDecodeThreadHighPriority);
     Running = false;
     Terminate();
+    Event.Set();
     Resume();
-    // Event.Set();
     WaitFor();
 }
 //---------------------------------------------------------------------------

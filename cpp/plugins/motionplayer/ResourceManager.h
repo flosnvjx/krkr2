@@ -2,22 +2,30 @@
 // Created by LiDon on 2025/9/15.
 //
 #pragma once
-
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include "tjs.h"
-#include "WindowImpl.h"
-#include "psbfile/PSBFile.h"
 
-namespace emote {
+namespace motion {
 
     class ResourceManager {
     public:
-        explicit ResourceManager() = default;
+        ResourceManager();
 
-        explicit ResourceManager(iTJSDispatch2 *window, tjs_int cacheSize);
+        explicit ResourceManager(iTJSDispatch2 *kag, tjs_int cacheSize);
 
-        tTJSVariant load(ttstr path);
-
-        const PSB::PSBFile *getPSBFile() const { return &_psbFile; }
+        tTJSVariant load(ttstr path) const;
+        tTJSVariant loadSource(ttstr path) const;
+        void unload(ttstr path) const;
+        void clearCache() const;
+        tTJSVariant getLastLoadedModule() const;
+        tTJSVariant findLoaded(ttstr path) const;
+        tTJSVariant findSource(ttstr path) const;
+        tjs_int requireLayerId();
+        tjs_int requireLayerIdForName(ttstr name);
+        void releaseLayerId(tjs_int id);
+        [[nodiscard]] static tjs_int getEmotePSBDecryptSeed();
 
         static tjs_error setEmotePSBDecryptSeed(tTJSVariant *r, tjs_int count,
                                                 tTJSVariant **p,
@@ -28,9 +36,17 @@ namespace emote {
                                                 iTJSDispatch2 *obj);
 
     private:
-        PSB::PSBFile _psbFile;
-        iTJSDispatch2 *_window; // tTJSNC_Window
-        tjs_int _cacheSize;
+        struct State {
+            std::unordered_map<std::string, tTJSVariant> loadedModules;
+            std::string lastLoadedPath;
+            tTJSVariant lastLoadedModule;
+            std::unordered_map<std::string, tjs_int> layerIdsByName;
+            std::unordered_map<tjs_int, std::string> layerNamesById;
+            std::unordered_set<tjs_int> usedLayerIds;
+            tjs_int nextLayerId = 1;
+        };
+
+        std::shared_ptr<State> _state;
         inline static int _decryptSeed;
     };
-} // namespace emote
+} // namespace motion

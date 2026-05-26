@@ -180,6 +180,9 @@ public:
     ~tTJSNI_BaseLayer() override;
     tjs_error Construct(tjs_int numparams, tTJSVariant **param,
                         iTJSDispatch2 *tjs_obj) override;
+    tjs_error ConstructResolvedTreeOwnerLike_0x800438(
+        class iTVPLayerTreeOwner *layerTreeOwner, tTJSNI_BaseLayer *parentLayer,
+        iTJSDispatch2 *tjs_obj, const tTJSVariantClosure &actionOwner);
     void Invalidate() override;
 
     iTJSDispatch2 *GetOwnerNoAddRef() const { return Owner; }
@@ -806,6 +809,15 @@ public:
                     const tTVPRect &srcrect, tTVPBBStretchType mode = stNearest,
                     bool clear = false);
 
+    void BezierPatchCopy(const tTVPPointD *points, tjs_int divx, tjs_int divy,
+                         iTVPBaseBitmap *src, const tTVPRect &srcrect,
+                         tTVPBBStretchType mode = stNearest,
+                         bool clear = false);
+
+    void MeshCopy(const tTVPPointD *points, tjs_int divx, tjs_int divy,
+                  iTVPBaseBitmap *src, const tTVPRect &srcrect,
+                  tTVPBBStretchType mode = stNearest, bool clear = false);
+
     void PileRect(tjs_int dx, tjs_int dy, tTJSNI_BaseLayer *src,
                   const tTVPRect &rect, tjs_int opacity = 255);
 
@@ -858,6 +870,20 @@ public:
                        tTVPBlendOperationMode mode = omAuto,
                        tjs_int opacity = 255,
                        tTVPBBStretchType type = stNearest);
+
+    void OperateBezierPatch(const tTVPPointD *points, tjs_int divx,
+                            tjs_int divy, iTVPBaseBitmap *src,
+                            const tTVPRect &srcrect,
+                            tTVPBlendOperationMode mode = omAuto,
+                            tjs_int opacity = 255,
+                            tTVPBBStretchType type = stNearest,
+                            bool clear = false);
+
+    void OperateMesh(const tTVPPointD *points, tjs_int divx, tjs_int divy,
+                     iTVPBaseBitmap *src, const tTVPRect &srcrect,
+                     tTVPBlendOperationMode mode = omAuto,
+                     tjs_int opacity = 255, tTVPBBStretchType type = stNearest,
+                     bool clear = false);
 
     void DoBoxBlur(tjs_int xblur = 1, tjs_int yblur = 1);
 
