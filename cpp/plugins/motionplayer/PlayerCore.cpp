@@ -1147,6 +1147,25 @@ namespace motion {
         _emoteDirty = true;
     }
 
+    tTJSVariant Player::getOuterForce(ttstr label) {
+        const auto key = lowerAscii(detail::narrow(label));
+        const OuterForceState *target = nullptr;
+        if(key == "bust") {
+            target = &_bustOuterForce;
+        } else if(key == "h") {
+            target = &_hairOuterForce;
+        } else if(key == "parts") {
+            target = &_partsOuterForce;
+        } else {
+            return tTJSVariant();
+        }
+
+        return detail::makeDictionary({
+            { "x", target->x },
+            { "y", target->y },
+        });
+    }
+
     // Aligned to libkrkr2.so sub_681EF8 at 0x681EF8:
     // Stores translate (x,y) to runtime+144/148 (cameraOffsetX/Y).
     // The full 6-param matrix version is handled by

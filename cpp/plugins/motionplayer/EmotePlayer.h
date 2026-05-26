@@ -28,7 +28,7 @@ namespace motion {
         ~EmotePlayer();
 
         // --- Properties ---
-        void setUseD3D(bool v) { _useD3D = v; }
+        void setUseD3D(bool v);
         [[nodiscard]] bool getUseD3D() const { return _useD3D; }
 
         void setCompletionType(int v) { _player.setCompletionType(v); }
@@ -93,13 +93,13 @@ namespace motion {
         void setQueuing(bool v) { _queuing = v; }
         [[nodiscard]] bool getQueuing() const { return _queuing; }
 
-        void setHairScale(double v) { _hairScale = v; }
+        void setHairScale(double v);
         [[nodiscard]] double getHairScale() const { return _hairScale; }
 
-        void setPartsScale(double v) { _partsScale = v; }
+        void setPartsScale(double v);
         [[nodiscard]] double getPartsScale() const { return _partsScale; }
 
-        void setBustScale(double v) { _bustScale = v; }
+        void setBustScale(double v);
         [[nodiscard]] double getBustScale() const { return _bustScale; }
 
         void setBodyScale(double v) { _bodyScale = v; }
@@ -134,12 +134,15 @@ namespace motion {
         void create();
         void load(tTJSVariant data);
         tTJSVariant clone();
+        tTJSVariant serialize();
+        void unserialize(tTJSVariant data);
         void show();
         void hide();
         void assignState();
-        void initPhysics();
+        void initPhysics(tTJSVariant rule = tTJSVariant());
 
         void setRot(double rot, double transition = 0.0, double ease = 0.0);
+        void setRotate(double rot, double transition = 0.0, double ease = 0.0);
         static tjs_error setRotCompat(tTJSVariant *result, tjs_int numparams,
                                       tTJSVariant **param,
                                       iTJSDispatch2 *objthis);
@@ -192,20 +195,24 @@ namespace motion {
         tTJSVariant getMainTimelineLabelList();
         tjs_int countDiffTimelines();
         ttstr getDiffTimelineLabelAt(tjs_int idx);
+        tTJSVariant getDiffTimelineLabelList();
         tjs_int countPlayingTimelines();
         ttstr getPlayingTimelineLabelAt(tjs_int idx);
         tjs_int getPlayingTimelineFlagsAt(tjs_int idx);
 
         bool isLoopTimeline(ttstr label);
+        bool getLoopTimeline(ttstr label);
         tjs_int getTimelineTotalFrameCount(ttstr label);
         void playTimeline(ttstr label, tjs_int flags);
         bool isTimelinePlaying(ttstr label);
+        bool getTimelinePlaying(ttstr label);
         void stopTimeline(ttstr label);
 
         void setTimelineBlendRatio(ttstr label, double ratio);
         double getTimelineBlendRatio(ttstr label);
         void fadeInTimeline(ttstr label, double duration, tjs_int flags);
         void fadeOutTimeline(ttstr label, double duration, tjs_int flags);
+        tTJSVariant getPlayingTimelineInfoList();
 
         void setTimeline(ttstr label, bool loop);
 

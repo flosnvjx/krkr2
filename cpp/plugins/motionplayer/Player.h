@@ -272,6 +272,7 @@ namespace motion {
         void stopWind();
         void setOuterForce(ttstr label, double x, double y,
                            double transition = 0.0, double ease = 0.0);
+        tTJSVariant getOuterForce(ttstr label);
         void setDrawAffineTranslateMatrix(tTJSVariant m);
         tTJSVariant getCameraOffset();
         void setCameraOffset(tTJSVariant offset);

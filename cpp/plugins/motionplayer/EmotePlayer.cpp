@@ -13,7 +13,6 @@
 #include "ncbind.hpp"
 
 #define LOGGER spdlog::get("plugin")
-#define STUB_WARN(name) LOGGER->warn("EmotePlayer::" #name "() stub called")
 
 namespace motion {
 
@@ -23,6 +22,11 @@ namespace motion {
 
     // --- Properties ---
 
+    void EmotePlayer::setUseD3D(bool v) {
+        _useD3D = v;
+        _player.setUseD3D(v);
+    }
+
     void EmotePlayer::setVisible(bool v) {
         _visible = v;
         _player.setVisible(v);
@@ -31,6 +35,24 @@ namespace motion {
     void EmotePlayer::setMeshDivisionRatio(double v) {
         _meshDivisionRatio = v;
         _player.setEmoteMeshDivisionRatio(v);
+    }
+
+    void EmotePlayer::setHairScale(double v) {
+        _hairScale = v;
+        _player.setHairScale(v);
+        _modified = true;
+    }
+
+    void EmotePlayer::setPartsScale(double v) {
+        _partsScale = v;
+        _player.setPartsScale(v);
+        _modified = true;
+    }
+
+    void EmotePlayer::setBustScale(double v) {
+        _bustScale = v;
+        _player.setBustScale(v);
+        _modified = true;
     }
 
     bool EmotePlayer::getAnimating() const { return _player.getAllplaying(); }
@@ -103,6 +125,12 @@ namespace motion {
         if(snapshot) {
             copy->_player.loadFromSnapshot(snapshot);
         }
+        copy->_player.setUseD3D(copy->_useD3D);
+        copy->_player.setHairScale(copy->_hairScale);
+        copy->_player.setPartsScale(copy->_partsScale);
+        copy->_player.setBustScale(copy->_bustScale);
+        copy->_player.setEmoteMeshDivisionRatio(copy->_meshDivisionRatio);
+        copy->_player.setVisible(copy->_visible);
 
         tTJSVariant result;
         if(iTJSDispatch2 *adaptor = AdaptorT::CreateAdaptor(copy)) {
@@ -124,14 +152,40 @@ namespace motion {
         _player.setVisible(false);
     }
 
-    void EmotePlayer::assignState() { STUB_WARN(assignState); }
-    void EmotePlayer::initPhysics() { STUB_WARN(initPhysics); }
+    void EmotePlayer::assignState() {
+        _player.setVisible(_visible && _drawVisible);
+        _player.setUseD3D(_useD3D);
+        _player.setHairScale(_hairScale);
+        _player.setPartsScale(_partsScale);
+        _player.setBustScale(_bustScale);
+        _player.setEmoteMeshDivisionRatio(_meshDivisionRatio);
+        _modified = false;
+    }
+
+    void EmotePlayer::initPhysics(tTJSVariant rule) {
+        if(rule.Type() != tvtVoid) {
+            _player.setMetadata(rule);
+        }
+        _player.initPhysics();
+        _modified = true;
+    }
+
+    tTJSVariant EmotePlayer::serialize() { return _player.serialize(); }
+
+    void EmotePlayer::unserialize(tTJSVariant data) {
+        _player.unserialize(data);
+        _modified = true;
+    }
 
     // Aligned to libkrkr2.so sub_5302E4: delegates to Player's rotAnimator
     void EmotePlayer::setRot(double rot, double transition, double ease) {
         _rot = rot;
         _player.setRotate(rot, transition, ease);
         _modified = true;
+    }
+
+    void EmotePlayer::setRotate(double rot, double transition, double ease) {
+        setRot(rot, transition, ease);
     }
 
     tjs_error EmotePlayer::setRotCompat(tTJSVariant *, tjs_int numparams,
@@ -375,6 +429,10 @@ namespace motion {
         return _player.getDiffTimelineLabelAt(idx);
     }
 
+    tTJSVariant EmotePlayer::getDiffTimelineLabelList() {
+        return _player.getDiffTimelineLabelList();
+    }
+
     tjs_int EmotePlayer::countPlayingTimelines() {
         return _player.countPlayingTimelines();
     }
@@ -391,6 +449,10 @@ namespace motion {
         return _player.getLoopTimeline(label);
     }
 
+    bool EmotePlayer::getLoopTimeline(ttstr label) {
+        return isLoopTimeline(label);
+    }
+
     tjs_int EmotePlayer::getTimelineTotalFrameCount(ttstr label) {
         return _player.getTimelineTotalFrameCount(label);
     }
@@ -402,6 +464,10 @@ namespace motion {
 
     bool EmotePlayer::isTimelinePlaying(ttstr label) {
         return _player.getTimelinePlaying(label);
+    }
+
+    bool EmotePlayer::getTimelinePlaying(ttstr label) {
+        return isTimelinePlaying(label);
     }
 
     void EmotePlayer::stopTimeline(ttstr label) { _player.stopTimeline(label); }
@@ -422,6 +488,10 @@ namespace motion {
     void EmotePlayer::fadeOutTimeline(ttstr label, double duration,
                                       tjs_int flags) {
         _player.fadeOutTimeline(label, duration, flags);
+    }
+
+    tTJSVariant EmotePlayer::getPlayingTimelineInfoList() {
+        return _player.getPlayingTimelineInfoList();
     }
 
     void EmotePlayer::setTimeline(ttstr label, bool loop) {
@@ -505,8 +575,7 @@ namespace motion {
     }
 
     tTJSVariant EmotePlayer::getOuterForce() {
-        STUB_WARN(getOuterForce);
-        return tTJSVariant();
+        return _player.getOuterForce(TJS_W("bust"));
     }
 
     bool EmotePlayer::contains(double x, double y) {
