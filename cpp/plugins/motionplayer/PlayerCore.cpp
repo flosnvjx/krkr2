@@ -320,13 +320,38 @@ namespace motion {
         _mirrorNegativeCache.clear();
 
         if(snapshot) {
+            snapshot->attachedSnapshots.clear();
             activateMotion(*_runtime, snapshot, &_resourceManagerNative);
             syncVariableKeysFromActiveMotion();
         }
     }
 
+    void Player::addEmoteFile(
+        std::shared_ptr<detail::MotionSnapshot> snapshot) {
+        if(!_runtime || !_runtime->activeMotion || !snapshot) {
+            return;
+        }
+        if(snapshot.get() == _runtime->activeMotion.get()) {
+            return;
+        }
+
+        auto &attached = _runtime->activeMotion->attachedSnapshots;
+        for(const auto &existing : attached) {
+            if(existing.get() == snapshot.get()) {
+                return;
+            }
+        }
+        attached.push_back(std::move(snapshot));
+        detail::mergeAttachedSnapshotResources(*_runtime->activeMotion,
+                                               *attached.back());
+        LOGGER->debug(
+            "Player::addEmoteFile({}): attached to primary path={} (count={})",
+            attached.back()->path, _runtime->activeMotion->path,
+            attached.size());
+    }
+
     void Player::bindMotionModuleKey(ttstr storageKey) {
-        // SDL3 reference: sdl3/emoteplayerclass.cpp set_motionKey()
+        // 参考 sdl3/emoteplayerclass.cpp（不编译）: set_motionKey()
         //   _currentfile = _resourceManager->GetPlayerByName(motionKey);
         // Does NOT start playback — that is play()'s job.
         const auto loaded = _resourceManagerNative.findLoadedModule(storageKey);
@@ -527,7 +552,13 @@ namespace motion {
     }
 
     void Player::initNonEmoteMotionLike_0x6B365C(std::uint32_t playFlags) {
-        if(!_runtime || !_runtime->activeMotion || _runtime->isEmoteMode) {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+        // e-mote3 PSB 常为 type=0（motion）但含 variableList；与 type=1 走同一初始化路径。
+        if(_runtime->isEmoteMode ||
+           !_runtime->activeMotion->variableLabels.empty()) {
+            initEmoteMotionLike_0x6B3A8C(playFlags);
             return;
         }
 
@@ -598,6 +629,9 @@ namespace motion {
 
         buildNodeTree();
         initVariables();
+        seedEmoteVariableDefaultsLike_sdl3();
+        syncParameterEntriesFromVariablesLike_sdl3();
+        logEmoteInitDiagnosticsOnce();
 
         if((playFlags & PlayFlagChain) == 0) {
             _frameLoopTime = 0.0;
@@ -606,6 +640,436 @@ namespace motion {
             _allplaying = true;
         }
         _allplaying = true;
+    }
+
+    void Player::initEmoteMotionLike_0x6B3A8C(std::uint32_t playFlags) {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+
+        const auto *clip = selectActiveClip();
+        _runtime->activeClip = clip;
+
+        resetNodeTreeForBuildLike_0x6B56F8();
+        _runtime->defaultParameterEntry = {};
+        _runtime->defaultParameterEntryPtr = nullptr;
+        _runtime->defaultParameterEntryIndex = -1;
+
+        const bool motionChanged =
+            !_runtime->activeMotion ||
+            _runtime->cachedParameterMotionPath !=
+                _runtime->activeMotion->path;
+        if(motionChanged) {
+            _runtime->parameterEntries.clear();
+            _runtime->parameterEntryById.clear();
+            _runtime->cachedParameterMotionPath =
+                _runtime->activeMotion ? _runtime->activeMotion->path
+                                       : std::string{};
+            _runtime->emoteDiagLogged = false;
+            _runtime->emoteFirstEvalDiagLogged = false;
+        }
+
+        if(clip != nullptr) {
+            _loopTime = clip->loopTime;
+            _cachedTotalFrames = clip->totalFrames;
+        } else if(_runtime->activeMotion) {
+            _cachedTotalFrames = 0.0;
+            for(const auto &[label, binding] :
+                _runtime->activeMotion->timelineControlByLabel) {
+                _cachedTotalFrames =
+                    std::max(_cachedTotalFrames, binding.lastTime);
+                if(binding.loopEnd >= binding.loopBegin) {
+                    _cachedTotalFrames =
+                        std::max(_cachedTotalFrames, binding.loopEnd);
+                }
+                (void)label;
+            }
+        }
+
+        if(_runtime->parameterEntries.empty()) {
+            loadMotionParameterTableLike_sdl3();
+        }
+
+        buildNodeTree();
+        if(_runtime->defaultParameterEntryIndex >= 0) {
+            const int defaultIndex = _runtime->defaultParameterEntryIndex;
+            for(size_t i = 1; i < _runtime->nodes.size(); ++i) {
+                auto &node = _runtime->nodes[i];
+                if(node.parameterizeIndex >= 0) {
+                    continue;
+                }
+                node.parameterizeIndex = defaultIndex;
+                if(static_cast<size_t>(defaultIndex) <
+                   _runtime->parameterEntries.size()) {
+                    node.parameterEntry =
+                        &_runtime->parameterEntries[static_cast<size_t>(
+                            defaultIndex)];
+                }
+            }
+        }
+        initVariables();
+        seedEmoteVariableDefaultsLike_sdl3();
+        syncParameterEntriesFromVariablesLike_sdl3();
+        logEmoteInitDiagnosticsOnce();
+
+        if((playFlags & PlayFlagChain) == 0) {
+            _frameLoopTime = 0.0;
+            _clampedEvalTime = 0.0;
+            _queuing = true;
+        }
+        _speed = true;
+        _allplaying = true;
+
+        if(_runtime->nodes.size() <= 1) {
+            LOGGER->warn(
+                "Player::initEmoteMotionLike_0x6B3A8C: node tree empty for "
+                "{} — check clip.layer[] index resolution (C-1)",
+                _runtime->activeMotion->path);
+        }
+    }
+
+    void Player::loadMotionParameterTableLike_sdl3() {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+
+        const auto loadFromObject =
+            [this](const std::shared_ptr<const PSB::PSBDictionary> &obj)
+            -> bool {
+                if(!obj) {
+                    return false;
+                }
+                const auto parameterizeValue = (*obj)["parameterize"];
+                if(auto parameterizeObject =
+                       std::dynamic_pointer_cast<const PSB::PSBDictionary>(
+                           parameterizeValue)) {
+                    appendParameterEntryLike_0x6B1718(parameterizeObject);
+                    finalizeParameterTableLike_0x6B1ECC();
+                    if(!_runtime->parameterEntries.empty()) {
+                        _runtime->defaultParameterEntryIndex = 0;
+                        _runtime->defaultParameterEntryPtr =
+                            &_runtime->parameterEntries.front();
+                    }
+                    return true;
+                }
+
+                parseParameterListLike_0x6B202C((*obj)["parameter"]);
+                if(_runtime->parameterEntries.empty()) {
+                    return false;
+                }
+                if(auto numeric = std::dynamic_pointer_cast<PSB::PSBNumber>(
+                       parameterizeValue)) {
+                    int index = 0;
+                    switch(numeric->numberType) {
+                        case PSB::PSBNumberType::Float:
+                            index =
+                                static_cast<int>(numeric->getValue<float>());
+                            break;
+                        case PSB::PSBNumberType::Double:
+                            index =
+                                static_cast<int>(numeric->getValue<double>());
+                            break;
+                        case PSB::PSBNumberType::Int:
+                            index = numeric->getValue<int>();
+                            break;
+                        case PSB::PSBNumberType::Long:
+                        default:
+                            index = static_cast<int>(
+                                numeric->getValue<tjs_int64>());
+                            break;
+                    }
+                    if(index >= 0 &&
+                       static_cast<size_t>(index) <
+                           _runtime->parameterEntries.size()) {
+                        _runtime->defaultParameterEntryIndex = index;
+                        _runtime->defaultParameterEntryPtr =
+                            &_runtime->parameterEntries[static_cast<size_t>(
+                                index)];
+                    }
+                } else if(!_runtime->parameterEntries.empty()) {
+                    _runtime->defaultParameterEntryIndex = 0;
+                    _runtime->defaultParameterEntryPtr =
+                        &_runtime->parameterEntries.front();
+                }
+                return true;
+            };
+
+        auto &motion = *_runtime->activeMotion;
+        const detail::MotionClip *preferred = nullptr;
+        const detail::MotionClip *largest = nullptr;
+        size_t largestCount = 0;
+
+        for(const auto &motionClip : motion.clipList) {
+            if(!motionClip.motionObject) {
+                continue;
+            }
+            const auto paramList = std::dynamic_pointer_cast<PSB::PSBList>(
+                (*motionClip.motionObject)["parameter"]);
+            const size_t count = paramList ? paramList->size() : 0;
+            if(count > largestCount) {
+                largestCount = count;
+                largest = &motionClip;
+            }
+            if(motionClip.label == "頭部変形基礎" ||
+               motionClip.label == "全体構造") {
+                if(count > 0) {
+                    preferred = &motionClip;
+                }
+            }
+        }
+
+        const detail::MotionClip *clip = selectActiveClip();
+        if(preferred) {
+            loadFromObject(preferred->motionObject);
+        } else if(largest) {
+            loadFromObject(largest->motionObject);
+        } else if(clip && clip->motionObject) {
+            loadFromObject(clip->motionObject);
+        }
+
+        if(_runtime->parameterEntries.empty()) {
+            if(!loadFromObject(motion.root) && motion.root) {
+                const auto content =
+                    std::dynamic_pointer_cast<const PSB::PSBDictionary>(
+                        (*motion.root)["content"]);
+                loadFromObject(content);
+            }
+        }
+    }
+
+    void Player::seedEmoteVariableDefaultsLike_sdl3() {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+        // 参考 sdl3 emotemetadata::_varList 初始化为 0（不编译）。
+        for(const auto &label : _runtime->activeMotion->variableLabels) {
+            if(_variableValues.find(label) == _variableValues.end()) {
+                _variableValues[label] = 0.0;
+            }
+        }
+        for(const auto &[label, frames] :
+            _runtime->activeMotion->variableFrames) {
+            if(frames.empty() ||
+               _variableValues.find(label) != _variableValues.end()) {
+                continue;
+            }
+            _variableValues[label] = frames.front().value;
+        }
+    }
+
+    void Player::logEmoteInitDiagnosticsOnce() {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+        const bool emoteLike = _runtime->isEmoteMode ||
+            !_runtime->parameterEntries.empty() ||
+            !_runtime->activeMotion->variableLabels.empty();
+        if(!emoteLike) {
+            return;
+        }
+        const auto *clip = _runtime->activeClip;
+        if(clip && clip->label != "全体構造" && clip->label != "頭部変形基礎" &&
+           _runtime->nodes.size() < 40) {
+            return;
+        }
+        if(_runtime->emoteDiagLogged &&
+           _runtime->emoteDiagMotionPath == _runtime->activeMotion->path) {
+            return;
+        }
+        _runtime->emoteDiagLogged = true;
+        _runtime->emoteDiagMotionPath = _runtime->activeMotion->path;
+        int paramNodeCount = 0;
+        int sourcedCount = 0;
+        int stencilZeroCount = 0;
+        int paramNodeEmptySrc = 0;
+        std::string paramNodeSample;
+        for(size_t i = 1; i < _runtime->nodes.size(); ++i) {
+            const auto &node = _runtime->nodes[i];
+            if(node.hasSource) {
+                ++sourcedCount;
+            }
+            if(node.hasSource && node.stencilType == 0) {
+                ++stencilZeroCount;
+            }
+            if(node.parameterizeIndex < 0) {
+                continue;
+            }
+            ++paramNodeCount;
+            if(node.hasSource && node.interpolatedCache.src.empty()) {
+                ++paramNodeEmptySrc;
+            }
+            if(node.parameterizeIndex >= 0 &&
+               static_cast<size_t>(node.parameterizeIndex) >=
+                   _runtime->parameterEntries.size()) {
+                ++paramNodeEmptySrc;
+            }
+            if(paramNodeSample.size() < 240) {
+                if(!paramNodeSample.empty()) {
+                    paramNodeSample += ", ";
+                }
+                double tick = 0.0;
+                if(node.parameterEntry) {
+                    tick = node.parameterEntry->value;
+                }
+                paramNodeSample += fmt::format(
+                    "{}[p{} tick={:.2f} src={} stencil={}]",
+                    node.layerName.empty() ? "<none>" : node.layerName,
+                    node.parameterizeIndex, tick,
+                    node.hasSource ? "y" : "n", node.stencilType);
+            }
+        }
+
+        std::string paramTableSample;
+        for(size_t i = 0;
+            i < _runtime->parameterEntries.size() && paramTableSample.size() < 240;
+            ++i) {
+            const auto &entry = _runtime->parameterEntries[i];
+            if(!paramTableSample.empty()) {
+                paramTableSample += ", ";
+            }
+            paramTableSample +=
+                fmt::format("{}={:.2f}", entry.id, entry.value);
+        }
+
+        LOGGER->warn(
+            "emote init diag: emoteMode={} path={} clip={} nodes={} layerList={} "
+            "params={} paramNodes={} sourced={} stencil0={} "
+            "paramOOR={} paramTable=[{}] paramNodesSample=[{}]",
+            _runtime->isEmoteMode ? 1 : 0,
+            _runtime->activeMotion->path,
+            clip ? clip->label : std::string("<none>"), _runtime->nodes.size(),
+            _runtime->activeMotion->layerList.size(),
+            _runtime->parameterEntries.size(), paramNodeCount, sourcedCount,
+            stencilZeroCount, paramNodeEmptySrc, paramTableSample,
+            paramNodeSample);
+        if(_runtime->parameterEntries.empty()) {
+            LOGGER->warn(
+                "emote init diag: parameter table empty for {} — check "
+                "clip/root parameter[] (对照 sdl3 emotemotion::parameter)",
+                _runtime->activeMotion->path);
+        }
+    }
+
+    void Player::logEmoteFirstEvalDiagnosticsOnce() {
+        if(!_runtime || !_runtime->activeMotion) {
+            return;
+        }
+        const bool emoteLike = _runtime->isEmoteMode ||
+            !_runtime->parameterEntries.empty() ||
+            !_runtime->activeMotion->variableLabels.empty();
+        if(!emoteLike) {
+            return;
+        }
+        const auto *clip = _runtime->activeClip;
+        if(clip && clip->label != "頭部変形基礎" && _runtime->nodes.size() < 80) {
+            return;
+        }
+        if(_runtime->emoteFirstEvalDiagLogged &&
+           _runtime->emoteDiagMotionPath == _runtime->activeMotion->path) {
+            return;
+        }
+        _runtime->emoteFirstEvalDiagLogged = true;
+        _runtime->emoteDiagMotionPath = _runtime->activeMotion->path;
+
+        int inactiveActive = 0;
+        int paramNodeCount = 0;
+        int emptySrcCount = 0;
+        int hiddenCount = 0;
+        std::string sample;
+        std::string faceSample;
+        for(size_t i = 1; i < _runtime->nodes.size(); ++i) {
+            const auto &node = _runtime->nodes[i];
+            const auto &name = node.layerName;
+            const bool facePart =
+                name.find("mouth") != std::string::npos ||
+                name.find("Mouth") != std::string::npos ||
+                name.find("nose") != std::string::npos ||
+                name.find("Nose") != std::string::npos ||
+                name.find("eye") != std::string::npos ||
+                name.find("Eye") != std::string::npos ||
+                name.find("口") != std::string::npos ||
+                name.find("鼻") != std::string::npos ||
+                name.find("目") != std::string::npos;
+            if(node.parameterizeIndex < 0) {
+                if(facePart && faceSample.size() < 200) {
+                    if(!faceSample.empty()) {
+                        faceSample += ", ";
+                    }
+                    faceSample += fmt::format(
+                        "{}[p=-1 src={} draw={}]",
+                        name.empty() ? "<none>" : name,
+                        node.interpolatedCache.src.empty()
+                            ? "n"
+                            : node.interpolatedCache.src,
+                        node.drawFlag ? "y" : "n");
+                }
+                continue;
+            }
+            ++paramNodeCount;
+            if(node.hasSource && node.interpolatedCache.src.empty()) {
+                ++emptySrcCount;
+            }
+            if(!node.drawFlag) {
+                ++hiddenCount;
+            }
+            if(!node.accumulated.active) {
+                ++inactiveActive;
+            }
+            if(facePart && faceSample.size() < 320) {
+                if(!faceSample.empty()) {
+                    faceSample += ", ";
+                }
+                std::string paramId;
+                double tick = 0.0;
+                if(node.parameterEntry) {
+                    paramId = node.parameterEntry->id;
+                    tick = node.parameterEntry->value;
+                }
+                faceSample += fmt::format(
+                    "{}[p{} id={} tick={:.2f} src={} draw={}]",
+                    name.empty() ? "<none>" : name, node.parameterizeIndex,
+                    paramId.empty() ? "?" : paramId, tick,
+                    node.interpolatedCache.src.empty()
+                        ? "n"
+                        : node.interpolatedCache.src,
+                    node.drawFlag ? "y" : "n");
+            }
+            if(sample.size() < 320) {
+                if(!sample.empty()) {
+                    sample += ", ";
+                }
+                std::string paramId;
+                double tick = 0.0;
+                if(node.parameterEntry) {
+                    paramId = node.parameterEntry->id;
+                    tick = node.parameterEntry->value;
+                }
+                sample += fmt::format(
+                    "{}[p{} id={} tick={:.2f} src={} draw={} stencil={}]",
+                    node.layerName.empty() ? "<none>" : node.layerName,
+                    node.parameterizeIndex, paramId.empty() ? "?" : paramId,
+                    tick,
+                    node.interpolatedCache.src.empty()
+                        ? "n"
+                        : node.interpolatedCache.src,
+                    node.drawFlag ? "y" : "n", node.stencilType);
+            }
+        }
+
+        LOGGER->warn(
+            "emote first eval: emoteMode={} path={} clip={} paramNodes={} "
+            "emptySrc={} hidden={} inactiveActive={} face=[{}] sample=[{}]",
+            _runtime->isEmoteMode ? 1 : 0,
+            _runtime->activeMotion->path,
+            clip ? clip->label : std::string("<none>"), paramNodeCount,
+            emptySrcCount, hiddenCount, inactiveActive, faceSample, sample);
+        if(emptySrcCount > 0 || hiddenCount > 0) {
+            LOGGER->warn(
+                "emote first eval: {} param nodes missing src, {} hidden, {} "
+                "inactive accumulated.active (口/眼: delta.visibleOverride / "
+                "parent.visible / stencilType)",
+                emptySrcCount, hiddenCount, inactiveActive);
+        }
     }
 
     void Player::syncVariableKeysFromActiveMotion() {
@@ -879,13 +1343,8 @@ namespace motion {
     // player+1136..1152. The Spring physics system drives emote hair/bust/parts
     // oscillation. Full spring simulation not yet implemented for web port —
     // store params only.
-    void Player::initPhysics() {
-        // SDL3 ref: sdl3/emoteplayerclass.cpp initPhysics() is TODO.
-        // libkrkr2.so stores spring params at player+1136..1152.
-        // Metadata/rule object may arrive via EmotePlayer.initPhysics(rule).
-        LOGGER->info(
-            "Player::initPhysics(): spring simulator not fully reversed; "
-            "accepting call (SDL3 ref: TODO, metadata via setMetadata)");
+    void Player::initPhysics(tTJSVariant metadata) {
+        // 参考 sdl3/emoteplayerclass.cpp initPhysics()（不编译）；libkrkr2.so 弹簧参数待补全
         // player+1128 = physics object (not created)
         // player+1136..1152 = min, max, amplitude, freq1, freq2
     }

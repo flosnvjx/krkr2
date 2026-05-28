@@ -206,6 +206,8 @@ namespace motion::detail {
         std::vector<std::string> resourceAliases;
         double width = 0.0;
         double height = 0.0;
+        // 参考 sdl3/emotefile::_attach（不编译）: MultiCache 复合 PSB 交叉引用
+        std::vector<std::shared_ptr<MotionSnapshot>> attachedSnapshots;
     };
 
     // Aligned to libkrkr2.so Player+1296 std::vector<LabelEntry> written by
@@ -399,7 +401,60 @@ namespace motion::detail {
         // Aligned to libkrkr2.so Player_playImpl (0x6B2284):
         // PSB root "type" field: 0=non-emote (motion), 1=emote
         bool isEmoteMode = false;
+        bool emoteDiagLogged = false;
+        bool emoteFirstEvalDiagLogged = false;
+        std::string emoteDiagMotionPath;
+        std::string cachedParameterMotionPath;
     };
+
+    // e-mote3 PSB type=0 但含 variableList；行为对齐 sdl3 _varList.size()>0 分支。
+    inline bool isEmoteLikeMotion(const PlayerRuntime &runtime) {
+        return runtime.isEmoteMode ||
+            (runtime.activeMotion &&
+             !runtime.activeMotion->variableLabels.empty());
+    }
+
+    // Timeline loop wrap aligned to libkrkr2.so Player_progress_inner (0x6C106C).
+    // Returns false when playback should stop. Guards degenerate loopTime >=
+    // totalFrames configs that would otherwise spin forever.
+    inline bool wrapTimelineCurrentTime(double &currentTime, double totalFrames,
+                                        double loopTime) {
+        if(totalFrames <= 0.0 || currentTime < totalFrames) {
+            return true;
+        }
+        if(loopTime < 0.0) {
+            currentTime = totalFrames;
+            return false;
+        }
+        if(loopTime >= totalFrames) {
+            currentTime = totalFrames;
+            return false;
+        }
+        int guard = 0;
+        while(currentTime >= totalFrames && ++guard < 1024) {
+            currentTime = currentTime + loopTime - totalFrames;
+        }
+        if(currentTime >= totalFrames) {
+            currentTime = totalFrames;
+            return false;
+        }
+        return true;
+    }
+
+    inline double wrapTimelineCurrentTimeValue(double time, double totalFrames,
+                                               double loopEnd) {
+        if(totalFrames <= 0.0 || time < totalFrames) {
+            return time;
+        }
+        if(loopEnd < 0.0 || loopEnd >= totalFrames) {
+            return totalFrames;
+        }
+        int guard = 0;
+        while(time >= totalFrames && ++guard < 1024) {
+            time = time - totalFrames + loopEnd;
+        }
+        return time >= totalFrames ? totalFrames : time;
+    }
 
     void ensureRootNodeLike_0x6CED30(PlayerRuntime &runtime);
     void resetNodeTreeKeepRootLike_0x6B56F8(PlayerRuntime &runtime);
@@ -415,6 +470,17 @@ namespace motion::detail {
                                         const std::string &source,
                                         std::vector<ttstr> &candidates);
 
+    // Resolve PSB layer/node reference: inline dict or index into root layerList
+    // (参考 sdl3 emotenode children / emotemotion layer[]).
+    std::shared_ptr<const PSB::PSBDictionary> resolveLayerDictionaryReference(
+        const std::shared_ptr<PSB::IPSBValue> &item,
+        const std::vector<std::shared_ptr<const PSB::PSBDictionary>> &layerList);
+
+    // MultiCache composite: merge attached PSB resources into primary snapshot
+    // (参考 sdl3 emotefile::_attach resource lookup).
+    void mergeAttachedSnapshotResources(MotionSnapshot &primary,
+                                        const MotionSnapshot &attached);
+
     std::shared_ptr<MotionSnapshot> loadMotionSnapshot(const ttstr &path,
                                                        tjs_int decryptSeed);
     tTJSVariant loadPSBVariant(const ttstr &path, tjs_int decryptSeed);
@@ -424,6 +490,8 @@ namespace motion::detail {
                            const std::shared_ptr<MotionSnapshot> &snapshot);
     std::shared_ptr<MotionSnapshot>
     lookupModuleSnapshot(const tTJSVariant &module);
+    void unregisterModuleSnapshot(const tTJSVariant &module);
+    void clearModuleSnapshots();
 
     tTJSVariant makeArray(const std::vector<tTJSVariant> &items);
     tTJSVariant makeDictionary(

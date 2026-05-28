@@ -397,6 +397,31 @@ namespace motion {
         }
 
         applyClampControlsLike_0x67C8A8();
+
+        // mouthControl talkLabel：face_talk 变化时同步到 talk 变量（口型）
+        const auto *activeMotion = _runtime ? _runtime->activeMotion.get() : nullptr;
+        if(activeMotion) {
+            double faceTalk = 0.0;
+            bool hasFaceTalk = false;
+            if(const auto it = _evalResultValues.find("face_talk");
+               it != _evalResultValues.end()) {
+                faceTalk = it->second;
+                hasFaceTalk = true;
+            } else if(const auto it = _variableValues.find("face_talk");
+                      it != _variableValues.end()) {
+                faceTalk = it->second;
+                hasFaceTalk = true;
+            }
+            if(hasFaceTalk) {
+                for(const auto &binding : activeMotion->fixedControllerOutputs) {
+                    if(binding.type == 6 && binding.role == "talkLabel" &&
+                       !binding.label.empty()) {
+                        writeEvalResultValueLike_0x6C4668(binding.label,
+                                                          faceTalk);
+                    }
+                }
+            }
+        }
     }
 
     void Player::preProgressPlayingTimelinesLike_0x671764(
@@ -441,13 +466,9 @@ namespace motion {
                 state.currentTime += dt;
                 if(state.totalFrames > 0.0 &&
                    state.currentTime >= state.totalFrames) {
-                    if(state.loopTime >= 0.0) {
-                        while(state.currentTime >= state.totalFrames) {
-                            state.currentTime = state.currentTime +
-                                state.loopTime - state.totalFrames;
-                        }
-                    } else {
-                        state.currentTime = state.totalFrames;
+                    if(!detail::wrapTimelineCurrentTime(state.currentTime,
+                                                        state.totalFrames,
+                                                        state.loopTime)) {
                         state.playing = false;
                         keepPlaying = false;
                     }
@@ -530,9 +551,21 @@ namespace motion {
                     while(remaining > 0.0 &&
                           state.currentTime + remaining >= loopEnd) {
                         const double currentTime = state.currentTime;
+                        const double segment =
+                            std::max(loopEnd - currentTime, 0.0);
+                        if(segment <= 0.0) {
+                            // applyTimelineControlWindow sets currentTime to
+                            // loopEnd; without wrapping, remaining never drops.
+                            state.currentTime = loopBegin;
+                            resetTimelineControlStateLike_0x671A50(
+                                state, *binding, loopBegin);
+                            remaining -= std::min(remaining, 1.0);
+                            continue;
+                        }
                         applyTimelineControlWindowLike_0x669E1C(state, *binding,
                                                                 loopEnd, false);
-                        remaining -= std::max(loopEnd - currentTime, 0.0);
+                        remaining -= segment;
+                        state.currentTime = loopBegin;
                         resetTimelineControlStateLike_0x671A50(state, *binding,
                                                                loopBegin);
                     }
@@ -856,7 +889,74 @@ namespace motion {
     }
 
 
+    void Player::dispatchPendingMotionEvents(iTJSDispatch2 *objthis) {
+        if(!_runtime || _runtime->pendingEvents.empty() || !objthis) {
+            return;
+        }
+        for(const auto &ev : _runtime->pendingEvents) {
+            try {
+                if(ev.type == 0) {
+                    tTJSVariant p1(detail::widen(ev.param1));
+                    tTJSVariant p2(detail::widen(ev.param2));
+                    tTJSVariant *args[] = { &p1, &p2 };
+                    objthis->FuncCall(0, TJS_W("onAction"), nullptr, nullptr, 2,
+                                      args, objthis);
+                } else if(ev.type == 1) {
+                    objthis->FuncCall(0, TJS_W("onSync"), nullptr, nullptr, 0,
+                                      nullptr, objthis);
+                }
+            } catch(...) {
+            }
+        }
+        _runtime->pendingEvents.clear();
+    }
+
+    void Player::progressEmoteLike_sdl3(double deltaMs,
+                                        iTJSDispatch2 *objthis) {
+        ensureMotionLoaded();
+        if(!_runtime) {
+            return;
+        }
+
+        _runtime->pendingEvents.clear();
+        if(deltaMs < 0.0 || deltaMs > 60000.0) {
+            deltaMs = 0.0;
+        }
+
+        const double dtFrames = deltaMs * kMotionFramesPerMillisecond;
+        _frameLastTime = dtFrames;
+
+        // sdl3: clockPassed += mstime/speedRatio（仅 _playing）；立绘树固定 progress(0)。
+        if(_speed && dtFrames > 0.0) {
+            _frameLoopTime += dtFrames;
+            _loopTime += dtFrames;
+            preProgressPlayingTimelinesLike_0x671764(dtFrames, nullptr);
+            applyEvalResultPostProcessLike_0x67CC9C();
+        }
+
+        syncParameterEntriesFromVariablesLike_sdl3();
+
+        if(_queuing) {
+            _allplaying = !_runtime->playingTimelineLabels.empty();
+            _syncActive = _syncWaiting && _allplaying;
+        }
+
+        _clampedEvalTime = 0.0;
+        if(!_runtime->nodes.empty()) {
+            updateLayersEmoteLike_sdl3();
+        }
+        calcBounds();
+        dispatchPendingMotionEvents(objthis);
+
+        _allplaying = !_runtime->playingTimelineLabels.empty();
+        _syncActive = _syncWaiting && _allplaying;
+    }
+
     void Player::progressMsLike_0x6D2A54(double deltaMs) {
+        if(_runtime && detail::isEmoteLikeMotion(*_runtime)) {
+            progressEmoteLike_sdl3(deltaMs, nullptr);
+            return;
+        }
         ensureMotionLoaded();
         if(deltaMs < 0 || deltaMs > 60000) {
             deltaMs = 0;
@@ -885,6 +985,10 @@ namespace motion {
             return TJS_E_INVALIDOBJECT;
         }
 
+        if(!self->_runtime) {
+            return TJS_E_FAIL;
+        }
+
         self->ensureMotionLoaded();
         detail::MotionTraceProgressScope motionTraceScope(self, objthis);
 
@@ -892,10 +996,18 @@ namespace motion {
         if(numparams > 0 && param[0] && param[0]->Type() != tvtVoid) {
             delta = param[0]->AsReal();
         }
-        // Clamp delta to sane range: TJS tick differences can overflow
-        // when uint32 wraps (e.g. 4294967381 = 2^32 + 85)
         if(delta < 0 || delta > 60000) {
             delta = 0;
+        }
+
+        // e-mote：走 sdl3 参考实现，不用 AI 反编译的 frameProgress+全量 phase3 管线。
+        // 必须在 ensureMotionLoaded 之后判定（variableLabels 来自 activeMotion）。
+        if(detail::isEmoteLikeMotion(*self->_runtime)) {
+            self->progressEmoteLike_sdl3(delta, objthis);
+            if(result) {
+                *result = tTJSVariant(self->getProgressCompat());
+            }
+            return TJS_S_OK;
         }
 
         self->_runtime->pendingEvents.clear();
@@ -912,10 +1024,6 @@ namespace motion {
                       delta * kMotionFramesPerMillisecond) < 0.000001,
             "progressCompat dt(ms)->frame conversion diverged from 0x6D2A98");
 
-        // Aligned to libkrkr2.so Player_progressCompat (0x6D2A98):
-        // progress_inner -> updateLayers -> calcBounds -> dispatchEvents.
-        // The binary assumes the node tree is already built (it was built
-        // eagerly inside play()/setMotion()), so there is no lazy build here.
         if(!self->_runtime->nodes.empty()) {
             detail::logoChainTraceLogf(
                 motionPath, "progressCompat.update", "0x6D2A98",
@@ -944,28 +1052,7 @@ namespace motion {
                          motionPath.c_str(), self->_clampedEvalTime);
         }
 
-        // Aligned to libkrkr2.so Player_dispatchEvents (0x6C4490):
-        // After stepping timelines, dispatch queued onAction/onSync events.
-        if(!self->_runtime->pendingEvents.empty()) {
-            for(const auto &ev : self->_runtime->pendingEvents) {
-                try {
-                    if(ev.type == 0) {
-                        // onAction(param1, param2)
-                        tTJSVariant p1(detail::widen(ev.param1));
-                        tTJSVariant p2(detail::widen(ev.param2));
-                        tTJSVariant *args[] = { &p1, &p2 };
-                        objthis->FuncCall(0, TJS_W("onAction"), nullptr,
-                                          nullptr, 2, args, objthis);
-                    } else if(ev.type == 1) {
-                        // onSync()
-                        objthis->FuncCall(0, TJS_W("onSync"), nullptr, nullptr,
-                                          0, nullptr, objthis);
-                    }
-                } catch(...) {
-                }
-            }
-            self->_runtime->pendingEvents.clear();
-        }
+        self->dispatchPendingMotionEvents(objthis);
 
         if(result) {
             *result = tTJSVariant(self->getProgressCompat());

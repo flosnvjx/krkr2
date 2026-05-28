@@ -69,14 +69,20 @@ namespace motion::detail {
 
         // Check if any frame in frameList has a non-empty "src" in its
         // "content".
-        bool
-        checkHasSource(const std::shared_ptr<const PSB::PSBDictionary> &node) {
+        bool checkHasSource(
+            const std::shared_ptr<const PSB::PSBDictionary> &node,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                &rootLayerList) {
             auto frameList = nodeTreePsbList(node, "frameList");
             if(!frameList)
                 return false;
             for(int i = 0; i < static_cast<int>(frameList->size()); ++i) {
-                auto frame = std::dynamic_pointer_cast<PSB::PSBDictionary>(
+                auto frame = std::dynamic_pointer_cast<const PSB::PSBDictionary>(
                     (*frameList)[i]);
+                if(!frame) {
+                    frame = resolveLayerDictionaryReference(
+                        (*frameList)[i], rootLayerList);
+                }
                 if(!frame)
                     continue;
                 auto content = std::dynamic_pointer_cast<PSB::PSBDictionary>(
@@ -112,6 +118,8 @@ namespace motion::detail {
         // Recursively walk PSB layer tree, appending nodes to the Player deque.
         void walkTree(const std::shared_ptr<const PSB::PSBDictionary> &psbNode,
                       int parentIdx, PlayerRuntime &runtime,
+                      const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                          &rootLayerList,
                       motion::ResourceManager *resourceManager,
                       motion::Player *ownerPlayer, int parentCompletionType) {
             if(!psbNode)
@@ -193,6 +201,8 @@ namespace motion::detail {
                 node.meshDivision = static_cast<int>(*v);
 
             // "stencilType" → stencilType (node+52)
+            const bool hasStencilTypeKey =
+                nodeTreePsbNumber(psbNode, "stencilType").has_value();
             if(auto v = nodeTreePsbNumber(psbNode, "stencilType")) {
                 node.stencilTypeBase = static_cast<int>(*v);
                 node.stencilType = node.stencilTypeBase;
@@ -236,7 +246,18 @@ namespace motion::detail {
                 node.particleAccelRatio = *v;
 
             // Check if any frame has a source image
-            node.hasSource = checkHasSource(psbNode);
+            node.hasSource = checkHasSource(psbNode, rootLayerList);
+            const bool emoteLikeMotion = detail::isEmoteLikeMotion(runtime) ||
+                !runtime.parameterEntries.empty();
+            if(emoteLikeMotion && node.hasSource && node.stencilType == 0) {
+                // e-mote PSB（type=0）常把 stencilType 写成 0；sub_6BD8DC 中 0 会判不可见。
+                // 参考 sdl3：有 content 的图层应参与绘制。
+                node.stencilTypeBase = 1;
+                node.stencilType = 1;
+            } else if(!hasStencilTypeKey && emoteLikeMotion && node.hasSource) {
+                node.stencilTypeBase = 1;
+                node.stencilType = 1;
+            }
 
             // "emoteEdit" → emoteEditDict (node+1980, sub_6B3C78 at 0x6B3D48)
             if(auto ee = std::dynamic_pointer_cast<PSB::PSBDictionary>(
@@ -286,14 +307,19 @@ namespace motion::detail {
 
             const int thisIdx = node.index;
 
-            // Recurse into "children"
+            // Recurse into "children" — entries may be inline dicts or indices
+            // into the root layerList (参考 sdl3 emotenode constructor).
             auto children = nodeTreePsbList(psbNode, "children");
             if(children) {
                 for(int i = 0; i < static_cast<int>(children->size()); ++i) {
-                    auto child = std::dynamic_pointer_cast<PSB::PSBDictionary>(
-                        (*children)[i]);
-                    walkTree(child, thisIdx, runtime, resourceManager,
-                             ownerPlayer, parentCompletionType);
+                    auto child = resolveLayerDictionaryReference(
+                        (*children)[i], rootLayerList);
+                    if(!child) {
+                        continue;
+                    }
+                    walkTree(child, thisIdx, runtime, rootLayerList,
+                             resourceManager, ownerPlayer,
+                             parentCompletionType);
                 }
             }
         }
@@ -321,13 +347,16 @@ namespace motion::detail {
             if(it != snapshot.clipIndexByLabel.end()) {
                 const int idx = it->second;
                 if(idx >= 0 &&
-                   idx < static_cast<int>(snapshot.clipList.size())) {
-                    layerList = &snapshot.clipList[idx].layerList;
+                   idx < static_cast<int>(snapshot.clipList.size()) &&
+                   !snapshot.clipList[static_cast<size_t>(idx)]
+                        .layerList.empty()) {
+                    layerList =
+                        &snapshot.clipList[static_cast<size_t>(idx)].layerList;
                 }
             }
         }
 
-        if(!layerList) {
+        if(!layerList || layerList->empty()) {
             layerList = &snapshot.layerList;
         }
 
@@ -342,8 +371,8 @@ namespace motion::detail {
         for(const auto &layerDict : *layerList) {
             if(!layerDict)
                 continue;
-            walkTree(layerDict, 0, runtime, resourceManager, ownerPlayer,
-                     parentCompletionType);
+            walkTree(layerDict, 0, runtime, snapshot.layerList, resourceManager,
+                     ownerPlayer, parentCompletionType);
         }
 
         // Aligned to Player_buildNodeTree post-pass (0x6B51F0..0x6B55AC):

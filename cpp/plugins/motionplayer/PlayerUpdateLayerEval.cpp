@@ -197,11 +197,30 @@ namespace motion::internal {
             slot = detail::MotionNode::ClipSlot{};
         }
 
+        std::shared_ptr<const PSB::PSBDictionary> resolveFrameDictionaryLike(
+            const std::shared_ptr<PSB::PSBList> &frames, int frameIndex,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                *rootLayerList) {
+            if(!frames || frameIndex < 0 ||
+               frameIndex >= static_cast<int>(frames->size())) {
+                return nullptr;
+            }
+            auto frame = std::dynamic_pointer_cast<const PSB::PSBDictionary>(
+                (*frames)[frameIndex]);
+            if(!frame && rootLayerList) {
+                frame = detail::resolveLayerDictionaryReference(
+                    (*frames)[frameIndex], *rootLayerList);
+            }
+            return frame;
+        }
+
         bool populateClipSlotFromFrameLike_0x6926B4(
             detail::MotionNode &node,
             const std::shared_ptr<PSB::PSBList> &frames, int frameIndex,
             const NodeTransformOrder &transformOrder,
             detail::MotionNode::ClipSlot &slot,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                *rootLayerList,
             FrameContentState *outState = nullptr) {
             if(!frames || frameIndex < 0 ||
                frameIndex >= static_cast<int>(frames->size())) {
@@ -209,15 +228,17 @@ namespace motion::internal {
                 return false;
             }
 
-            const auto frame = std::dynamic_pointer_cast<PSB::PSBDictionary>(
-                (*frames)[frameIndex]);
+            auto frame = resolveFrameDictionaryLike(
+                frames, frameIndex, rootLayerList);
             if(!frame) {
                 resetClipSlot(slot);
                 slot.frameIndex = frameIndex;
                 return false;
             }
 
-            ParsedFrame parsed = parseFrame(frame, node.nodeType);
+            ParsedFrame parsed = parseFrame(
+                std::const_pointer_cast<PSB::PSBDictionary>(frame),
+                node.nodeType);
             FrameContentState state;
             state.debugEvaluated = true;
             state.debugActiveIndex = frameIndex;
@@ -258,18 +279,18 @@ namespace motion::internal {
             return true;
         }
 
-        int
-        initialFrameIndexForTime(const std::shared_ptr<PSB::PSBList> &frames,
-                                 double currentTime) {
+        int initialFrameIndexForTime(
+            const std::shared_ptr<PSB::PSBList> &frames, double currentTime,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                *rootLayerList) {
             if(!frames || frames->size() == 0) {
                 return -1;
             }
 
             int selected = 0;
             for(size_t index = 0; index < frames->size(); ++index) {
-                const auto frame =
-                    std::dynamic_pointer_cast<PSB::PSBDictionary>(
-                        (*frames)[static_cast<int>(index)]);
+                const auto frame = resolveFrameDictionaryLike(
+                    frames, static_cast<int>(index), rootLayerList);
                 if(!frame) {
                     continue;
                 }
@@ -290,11 +311,33 @@ namespace motion::internal {
         }
 
         double frameSelectionTimeLike_0x6B7E44(const detail::MotionNode &node,
-                                               double currentTime) {
+                                               double currentTime,
+                                               bool isEmoteMode) {
             // sub_6B64AC/sub_6B7E44 read node+8->value when the node is
             // parameterized; otherwise they use the Player timeline time.
             if(node.parameterizeIndex >= 0 && node.parameterEntry != nullptr) {
                 return node.parameterEntry->value;
+            }
+            // 参考 sdl3/emotefile.cpp emotenode::progress（不编译）：
+            // 2 帧且 type=2/0 的节点在 motion 路径下锁定首帧 time。
+            if(isEmoteMode && node.psbNode) {
+                const auto frames = psbDictionaryList(node.psbNode, "frameList");
+                if(frames && frames->size() == 2) {
+                    const auto frame0 = std::dynamic_pointer_cast<
+                        const PSB::PSBDictionary>((*frames)[0]);
+                    const auto frame1 = std::dynamic_pointer_cast<
+                        const PSB::PSBDictionary>((*frames)[1]);
+                    if(frame0 && frame1) {
+                        const int type0 = static_cast<int>(
+                            psbDictionaryNumber(frame0, "type").value_or(0.0));
+                        const int type1 = static_cast<int>(
+                            psbDictionaryNumber(frame1, "type").value_or(0.0));
+                        if(type0 == 2 && type1 == 0) {
+                            return psbDictionaryNumber(frame0, "time")
+                                .value_or(0.0);
+                        }
+                    }
+                }
             }
             return currentTime;
         }
@@ -302,7 +345,9 @@ namespace motion::internal {
         bool initializeNodeTimelineSlotsLike_0x6B64AC(
             detail::MotionNode &node,
             const std::shared_ptr<PSB::PSBList> &frames, double currentTime,
-            const NodeTransformOrder &transformOrder) {
+            const NodeTransformOrder &transformOrder, bool isEmoteMode,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                *rootLayerList) {
             if(!frames || frames->size() == 0) {
                 resetClipSlot(node.slots[0]);
                 resetClipSlot(node.slots[1]);
@@ -312,14 +357,16 @@ namespace motion::internal {
             }
 
             const double selectionTime =
-                frameSelectionTimeLike_0x6B7E44(node, currentTime);
-            const int activeIndex =
-                initialFrameIndexForTime(frames, selectionTime);
+                frameSelectionTimeLike_0x6B7E44(node, currentTime, isEmoteMode);
+            const int activeIndex = initialFrameIndexForTime(
+                frames, selectionTime, rootLayerList);
             node.activeSlotIndex = 0;
             populateClipSlotFromFrameLike_0x6926B4(
-                node, frames, activeIndex, transformOrder, node.slots[0]);
+                node, frames, activeIndex, transformOrder, node.slots[0],
+                rootLayerList);
             populateClipSlotFromFrameLike_0x6926B4(
-                node, frames, activeIndex + 1, transformOrder, node.slots[1]);
+                node, frames, activeIndex + 1, transformOrder, node.slots[1],
+                rootLayerList);
             node.flags |= 0x01;
             node.hasTimelineEvalRatio = false;
             return true;
@@ -370,8 +417,10 @@ namespace motion::internal {
     } // namespace
 
     MOTIONPLAYER_NOINLINE FrameContentState
-    advanceNodeFrameSelectionLike_0x6926B4(detail::MotionNode &node,
-                                           double currentTime) {
+    advanceNodeFrameSelectionLike_0x6926B4(
+        detail::MotionNode &node, double currentTime, bool isEmoteMode,
+        const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+            *rootLayerList) {
         const auto frames = psbDictionaryList(node.psbNode, "frameList");
         if(!frames || frames->size() == 0) {
             node.activeSlot().done = true;
@@ -384,11 +433,12 @@ namespace motion::internal {
         const NodeTransformOrder transformOrder =
             readNodeTransformOrder(node.psbNode);
         const double selectionTime =
-            frameSelectionTimeLike_0x6B7E44(node, currentTime);
+            frameSelectionTimeLike_0x6B7E44(node, currentTime, isEmoteMode);
         if(node.activeSlot().frameIndex < 0 &&
            node.otherSlot().frameIndex < 0) {
             initializeNodeTimelineSlotsLike_0x6B64AC(node, frames, currentTime,
-                                                     transformOrder);
+                                                     transformOrder, isEmoteMode,
+                                                     rootLayerList);
         }
 
         const int lastForwardFrameIndex = static_cast<int>(frames->size()) - 2;
@@ -398,7 +448,8 @@ namespace motion::internal {
             node.activeSlotIndex ^= 1;
             const int nextIndex = node.activeSlot().frameIndex + 1;
             populateClipSlotFromFrameLike_0x6926B4(
-                node, frames, nextIndex, transformOrder, node.otherSlot());
+                node, frames, nextIndex, transformOrder, node.otherSlot(),
+                rootLayerList);
             node.flags |= 0x01;
             node.hasTimelineEvalRatio = false;
         }
@@ -408,7 +459,8 @@ namespace motion::internal {
             const int previousIndex = node.activeSlot().frameIndex - 1;
             node.activeSlotIndex ^= 1;
             populateClipSlotFromFrameLike_0x6926B4(
-                node, frames, previousIndex, transformOrder, node.activeSlot());
+                node, frames, previousIndex, transformOrder, node.activeSlot(),
+                rootLayerList);
             node.flags |= 0x01;
             node.hasTimelineEvalRatio = false;
         }
@@ -425,10 +477,13 @@ namespace motion::internal {
 
     MOTIONPLAYER_NOINLINE bool
     evaluateTimelineLike_0x699AE4(detail::MotionNode &node, bool dirtyArg,
-                                  double currentTime) {
+                                  double currentTime, bool isEmoteMode) {
         const bool dirty = dirtyArg || node.flags != 0;
         auto &active = node.activeSlot();
         auto &other = node.otherSlot();
+
+        currentTime =
+            frameSelectionTimeLike_0x6B7E44(node, currentTime, isEmoteMode);
 
         if(active.done) {
             return dirty;
@@ -651,6 +706,9 @@ namespace motion {
             for(const auto &[label, value] : _variableValues) {
                 bindParameterValueLike_0x6C4668(label, 0, value);
             }
+            // 参考 sdl3 emotemotion::getTickByIdx（不编译）：每帧从变量表刷新
+            // parameter entry，驱动 parameterize 节点（口/眼等）帧选择。
+            syncParameterEntriesFromVariablesLike_sdl3();
         }
     }
 
@@ -660,8 +718,20 @@ namespace motion {
         const std::string motionPath = _runtime->activeMotion
             ? _runtime->activeMotion->path
             : std::string();
+        const auto *layerList = _runtime->activeMotion
+            ? &_runtime->activeMotion->layerList
+            : nullptr;
+        // 参考 sdl3 emoteplayerclass::progress：有 metadata 变量时 body motion 用 tick=0，
+        // 表情/口/眼由 variable+parameter 驱动，避免 body 时间轴与变量打架导致卡顿/错位。
+        const bool emoteLike = detail::isEmoteLikeMotion(*_runtime);
+        const bool freezeBodyTimeline = emoteLike;
         for(size_t i = 1; i < nodes.size(); ++i) {
             auto &node = nodes[i];
+
+            double nodeEvalTime = currentTime;
+            if(freezeBodyTimeline && node.parameterizeIndex < 0) {
+                nodeEvalTime = 0.0;
+            }
 
             const int origParentIdx = node.parentIndex;
             int parentIdx = node.parentIndex;
@@ -699,8 +769,8 @@ namespace motion {
                     _independentLayerInherit ? 1 : 0);
             }
 
-            auto state =
-                advanceNodeFrameSelectionLike_0x6926B4(node, currentTime);
+            auto state = advanceNodeFrameSelectionLike_0x6926B4(
+                node, nodeEvalTime, emoteLike, layerList);
             if(detail::logoChainTraceEnabled(_runtime->activeMotion) &&
                state.debugEvaluated) {
                 detail::logoChainTraceLogf(
@@ -742,19 +812,15 @@ namespace motion {
             const bool timelineDirtyArg =
                 forceDirty || needGround || parentDirty || deltaDirty;
 
-            node.timelineParameterOverride = false;
-            node.timelineParameterValue = 0.0;
-            if(node.parameterizeIndex >= 0) {
-                auto *parameterEntry =
-                    resolveNodeParameterEntry(*_runtime, node);
-                if(parameterEntry != nullptr && parameterEntry->mode != 0) {
-                    node.timelineParameterOverride = true;
-                    node.timelineParameterValue = parameterEntry->value;
-                }
-            }
+            // sub_699AE4 只写 transform payload；可见性在 delta+继承链（sdl3 isNeedDraw）。
+            const double selectionTime = frameSelectionTimeLike_0x6B7E44(
+                node, nodeEvalTime, emoteLike);
+            populateDeltaStateFromFrameState(
+                node.delta, frameStateFromNodeSlots(node, selectionTime));
 
-            if(!evaluateTimelineLike_0x699AE4(node, timelineDirtyArg,
-                                              currentTime)) {
+            const bool timelineUpdated = evaluateTimelineLike_0x699AE4(
+                node, timelineDirtyArg, nodeEvalTime, emoteLike);
+            if(!timelineUpdated) {
                 continue;
             }
 

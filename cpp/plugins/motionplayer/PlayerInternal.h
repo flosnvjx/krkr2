@@ -1272,15 +1272,13 @@ namespace motion {
             result.time = psbDictionaryNumber(frame, "time").value_or(0.0);
             result.type = static_cast<int>(
                 psbDictionaryNumber(frame, "type").value_or(0.0));
-            result.invisible = (result.type == 0);
+            // 参考 sdl3 emoteframe::hasContent（有 content 键即可绘制，与 type 解耦）
+            const auto content = psbDictionaryValue(frame, "content");
+            result.invisible = content == nullptr;
             result.interpolate = (result.type == 3);
             result.slot.frameType = result.type;
-            if(!result.invisible) {
-                // sub_6926B4 at 0x692838: read content dict, then call
-                // sub_692AB0
-                if(const auto content = psbDictionaryValue(frame, "content")) {
-                    mergeFrameContent(content, result.slot, nodeType);
-                }
+            if(content) {
+                mergeFrameContent(content, result.slot, nodeType);
             }
             return result;
         }
@@ -1579,11 +1577,14 @@ namespace motion {
         // and writes node runtime state. These are intentionally non-inline in
         // PlayerUpdateLayers.cpp so native LLDB can hook the 0x699AE4 boundary.
         FrameContentState
-        advanceNodeFrameSelectionLike_0x6926B4(detail::MotionNode &node,
-                                               double currentTime);
+        advanceNodeFrameSelectionLike_0x6926B4(
+            detail::MotionNode &node, double currentTime, bool isEmoteMode,
+            const std::vector<std::shared_ptr<const PSB::PSBDictionary>>
+                *rootLayerList = nullptr);
 
         bool evaluateTimelineLike_0x699AE4(detail::MotionNode &node,
-                                           bool dirtyArg, double currentTime);
+                                           bool dirtyArg, double currentTime,
+                                           bool isEmoteMode);
 
 
         // -----------------------------------------------------------------

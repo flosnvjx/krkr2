@@ -10,11 +10,46 @@ namespace motion {
     // --- updateLayers: 3-phase pipeline ---
     // Aligned to libkrkr2.so Player_updateLayers (0x6BB33C).
     // Operates on persistent MotionNode deque instead of re-walking PSB tree.
+    void Player::updateLayersEmoteLike_sdl3() {
+        auto &nodes = _runtime->nodes;
+        if(nodes.empty()) {
+            return;
+        }
+        const double currentTime = _clampedEvalTime;
+
+        if(_runtime->perNodeEvalData.size() != nodes.size()) {
+            _runtime->perNodeEvalData.resize(nodes.size());
+        }
+        for(size_t ni = 0; ni < nodes.size(); ++ni) {
+            _runtime->perNodeEvalData[ni].evalTime = currentTime;
+        }
+
+        updateLayersPhase1_PreLoop(currentTime);
+        updateLayersPhase2_MainLoop(currentTime);
+        updateLayersPhase3_Visibility();
+        // sdl3 无 libkrkr2 子 Player 全量 updateLayers；嵌套 motion 仅在 src 变化时步进。
+        updateLayersPhase3_MotionSubNode(currentTime);
+
+        _noUpdateYet = false;
+        _queuing = false;
+        for(size_t ci = 1; ci < nodes.size(); ++ci) {
+            nodes[ci].flags &= ~0x01;
+            nodes[ci].accumulated.dirty = false;
+        }
+        for(auto &evalData : _runtime->perNodeEvalData) {
+            evalData.dirtyFlag = 0;
+        }
+    }
+
     void Player::updateLayers() {
         detail::motionTraceRecordUpdatePlayer(this);
         auto &nodes = _runtime->nodes;
         if(nodes.empty())
             return;
+        if(detail::isEmoteLikeMotion(*_runtime)) {
+            updateLayersEmoteLike_sdl3();
+            return;
+        }
         const auto motionPath = _runtime && _runtime->activeMotion
             ? _runtime->activeMotion->path
             : std::string{};
@@ -106,6 +141,7 @@ namespace motion {
         updateLayersPhase3_ParticleEmitter();
         updateLayersPhase3_ParticleSystem(currentTime);
         updateLayersPhase3_AnchorNode();
+        logEmoteFirstEvalDiagnosticsOnce();
 
         // === Post-loop cleanup ===
         // Aligned to 0x6BBCB4..0x6BBE1C: clear per-node flags and timeline

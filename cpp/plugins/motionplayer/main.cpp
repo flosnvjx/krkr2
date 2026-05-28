@@ -386,7 +386,7 @@ NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer) {
     NCB_METHOD(skipToSync);
     NCB_METHOD(addPlayCallback);
     NCB_METHOD(pass);
-    NCB_METHOD(progress);
+    NCB_METHOD_RAW_CALLBACK(progress, &EmotePlayer::progressCompat, 0);
     NCB_METHOD_DETAIL(draw, Class, void, Class::draw, (tTJSVariant));
     NCB_METHOD_RAW_CALLBACK(setDrawAffineTranslateMatrix,
                             &EmotePlayer::setDrawAffineTranslateMatrixCompat,
@@ -422,9 +422,14 @@ NCB_REGISTER_SUBCLASS(ResourceManager) {
 // Motion top-level class with constants and subclasses
 // ============================================================
 
-class Motion {};
+class Motion {
+public:
+    // manual.tjs: GPU(D3D) 描画可否。KrKr2 は OpenGL 経路のため true を返す。
+    static bool getD3DAvailable() { return true; }
+};
 
 NCB_REGISTER_CLASS(Motion) {
+    NCB_METHOD(getD3DAvailable);
     // Subclasses (Player registered as top-level class, aliased in
     // PostRegistCallback)
     NCB_SUBCLASS(ResourceManager, ResourceManager);
@@ -683,7 +688,7 @@ NCB_REGISTER_CLASS(D3DEmotePlayer) {
     NCB_METHOD(skipToSync);
     NCB_METHOD(addPlayCallback);
     NCB_METHOD(pass);
-    NCB_METHOD(progress);
+    NCB_METHOD_RAW_CALLBACK(progress, &EmotePlayer::progressCompat, 0);
     NCB_METHOD_DETAIL(draw, Class, void, Class::draw, (tTJSVariant));
     NCB_METHOD_RAW_CALLBACK(setDrawAffineTranslateMatrix,
                             &EmotePlayer::setDrawAffineTranslateMatrixCompat,

@@ -25,6 +25,49 @@ namespace {
                        });
         return value;
     }
+
+    ttstr trimMotionPath(ttstr path) {
+        if(path.StartsWith(TJS_W("lzfs://./"))) {
+            return path.SubString(9, path.GetLen() - 9);
+        }
+        return path;
+    }
+
+    std::vector<std::string> buildPathCacheKeys(const ttstr &path) {
+        std::vector<std::string> keys;
+        const auto pushUnique = [&keys](const std::string &key) {
+            if(key.empty()) {
+                return;
+            }
+            if(std::find(keys.begin(), keys.end(), key) == keys.end()) {
+                keys.push_back(key);
+            }
+        };
+
+        pushUnique(path.AsStdString());
+        const ttstr trimmed = trimMotionPath(path);
+        pushUnique(trimmed.AsStdString());
+        const ttstr placed = TVPGetPlacedPath(trimmed);
+        pushUnique(placed.AsStdString());
+        return keys;
+    }
+
+    std::vector<std::string>
+    collectModuleCacheKeys(
+        const std::unordered_map<std::string, tTJSVariant> &loadedModules,
+        iTJSDispatch2 *moduleObject) {
+        std::vector<std::string> keys;
+        if(!moduleObject) {
+            return keys;
+        }
+        for(const auto &[key, module] : loadedModules) {
+            if(module.Type() == tvtObject &&
+               module.AsObjectNoAddRef() == moduleObject) {
+                keys.push_back(key);
+            }
+        }
+        return keys;
+    }
 } // namespace
 
 motion::ResourceManager::ResourceManager() :
@@ -33,7 +76,11 @@ motion::ResourceManager::ResourceManager() :
 motion::ResourceManager::ResourceManager(iTJSDispatch2 *kag,
                                          tjs_int cacheSize) :
     _state(std::make_shared<State>()) {
-    LOGGER->info("kag: {}, cacheSize: {}", static_cast<void *>(kag), cacheSize);
+    if(cacheSize > 0) {
+        _state->cacheSize = cacheSize;
+    }
+    LOGGER->info("ResourceManager: kag={} cacheSize={}",
+                 static_cast<void *>(kag), _state->cacheSize);
 
     // Pre-define ShortCutInitialPadKeyMap on the KAG window if not already set.
     // The encrypted keybinder.tjs accesses .ShortCutInitialPadKeyMap on the
@@ -78,11 +125,19 @@ tjs_error motion::ResourceManager::setEmotePSBDecryptSeed(tTJSVariant *,
     return TJS_S_OK;
 }
 
-tjs_error motion::ResourceManager::setEmotePSBDecryptFunc(tTJSVariant *r,
-                                                          tjs_int n,
+tjs_error motion::ResourceManager::setEmotePSBDecryptFunc(tTJSVariant *,
+                                                          tjs_int count,
                                                           tTJSVariant **p,
-                                                          iTJSDispatch2 *obj) {
-    LOGGER->critical("setEmotePSBDecryptFunc no implement!");
+                                                          iTJSDispatch2 *) {
+    if(count != 1) {
+        return TJS_E_BADPARAMCOUNT;
+    }
+    if(!p[0]) {
+        return TJS_E_INVALIDPARAM;
+    }
+    _decryptFunc = p[0]->AsObjectClosure();
+    LOGGER->info("setEmotePSBDecryptFunc: {}",
+                 _decryptFunc.Object ? "closure stored" : "cleared");
     return TJS_S_OK;
 }
 
@@ -90,24 +145,24 @@ tTJSVariant motion::ResourceManager::load(ttstr path) const {
     const auto rawPath = path.AsStdString();
     const auto loweredPath = lowercase(rawPath);
     if(loweredPath.find(".mtn") != std::string::npos) {
-        LOGGER->warn("Motion resource manager load: {}", rawPath);
+        LOGGER->debug("ResourceManager::load motion: {}", rawPath);
+    } else if(loweredPath.find(".psb") != std::string::npos) {
+        LOGGER->debug("ResourceManager::load emote/psb: {}", rawPath);
     }
+
     const auto loaded = detail::loadPSBVariant(path, _decryptSeed);
-    if(loaded.Type() != tvtVoid && _state) {
-        const auto key = rawPath;
-        _state->loadedModules[key] = loaded;
-        // SDL3 ref: cache key uses TVPGetPlacedPath(trimPath).
-        ttstr trimmed = path;
-        if(path.StartsWith(TJS_W("lzfs://./"))) {
-            trimmed = path.SubString(9, path.GetLen() - 9);
+    if(loaded.Type() != tvtObject || !_state) {
+        if(loaded.Type() == tvtVoid) {
+            LOGGER->warn("ResourceManager::load({}) failed", rawPath);
         }
-        const ttstr placed = TVPGetPlacedPath(trimmed);
-        if(!placed.IsEmpty()) {
-            _state->loadedModules[placed.AsStdString()] = loaded;
-        }
-        _state->lastLoadedPath = key;
-        _state->lastLoadedModule = loaded;
+        return loaded;
     }
+
+    for(const auto &key : buildPathCacheKeys(path)) {
+        _state->loadedModules[key] = loaded;
+    }
+    _state->lastLoadedPath = rawPath;
+    _state->lastLoadedModule = loaded;
     return loaded;
 }
 
@@ -121,9 +176,31 @@ void motion::ResourceManager::unload(ttstr path) const {
         return;
     }
 
-    const auto key = path.AsStdString();
-    _state->loadedModules.erase(key);
-    if(_state->lastLoadedPath == key) {
+    tTJSVariant module;
+    for(const auto &key : buildPathCacheKeys(path)) {
+        const auto it = _state->loadedModules.find(key);
+        if(it != _state->loadedModules.end()) {
+            if(module.Type() == tvtVoid) {
+                module = it->second;
+            }
+        }
+    }
+
+    if(module.Type() == tvtObject) {
+        const auto keys =
+            collectModuleCacheKeys(_state->loadedModules,
+                                   module.AsObjectNoAddRef());
+        for(const auto &key : keys) {
+            _state->loadedModules.erase(key);
+        }
+        detail::unregisterModuleSnapshot(module);
+    } else {
+        for(const auto &key : buildPathCacheKeys(path)) {
+            _state->loadedModules.erase(key);
+        }
+    }
+
+    if(_state->lastLoadedPath == path.AsStdString()) {
         _state->lastLoadedPath.clear();
         _state->lastLoadedModule.Clear();
     }
@@ -142,6 +219,7 @@ void motion::ResourceManager::clearCache() const {
     _state->layerNamesById.clear();
     _state->usedLayerIds.clear();
     _state->nextLayerId = 1;
+    detail::clearModuleSnapshots();
 }
 
 tTJSVariant motion::ResourceManager::getLastLoadedModule() const {
@@ -149,12 +227,7 @@ tTJSVariant motion::ResourceManager::getLastLoadedModule() const {
 }
 
 tTJSVariant motion::ResourceManager::findLoaded(ttstr path) const {
-    if(!_state) {
-        return {};
-    }
-
-    const auto it = _state->loadedModules.find(path.AsStdString());
-    return it != _state->loadedModules.end() ? it->second : tTJSVariant{};
+    return findLoadedModule(path);
 }
 
 tTJSVariant motion::ResourceManager::findLoadedModule(ttstr path) const {
@@ -170,44 +243,22 @@ tTJSVariant motion::ResourceManager::findLoadedModule(ttstr path) const {
         return it != _state->loadedModules.end() ? it->second : tTJSVariant{};
     };
 
-    if(auto loaded = tryKey(path.AsStdString()); loaded.Type() == tvtObject) {
-        return loaded;
-    }
-
-    ttstr trimmed = path;
-    if(path.StartsWith(TJS_W("lzfs://./"))) {
-        trimmed = path.SubString(9, path.GetLen() - 9);
-    }
-    if(auto loaded = tryKey(trimmed.AsStdString());
-       loaded.Type() == tvtObject) {
-        return loaded;
-    }
-
-    const ttstr placed = TVPGetPlacedPath(trimmed);
-    if(!placed.IsEmpty()) {
-        if(auto loaded = tryKey(placed.AsStdString());
-           loaded.Type() == tvtObject) {
+    for(const auto &key : buildPathCacheKeys(path)) {
+        if(auto loaded = tryKey(key); loaded.Type() == tvtObject) {
             return loaded;
         }
     }
 
     for(const auto &candidate : detail::buildMotionLookupCandidates(path)) {
-        if(auto loaded = tryKey(candidate.AsStdString());
-           loaded.Type() == tvtObject) {
-            return loaded;
-        }
-        const ttstr candidatePlaced = TVPGetPlacedPath(candidate);
-        if(!candidatePlaced.IsEmpty()) {
-            if(auto loaded = tryKey(candidatePlaced.AsStdString());
-               loaded.Type() == tvtObject) {
+        for(const auto &key : buildPathCacheKeys(candidate)) {
+            if(auto loaded = tryKey(key); loaded.Type() == tvtObject) {
                 return loaded;
             }
         }
     }
 
-    LOGGER->warn("ResourceManager::findLoadedModule({}): cache miss "
-                 "(SDL3 ref: GetPlayerByName returns nullptr)",
-                 path.AsStdString());
+    LOGGER->debug("ResourceManager::findLoadedModule({}): cache miss",
+                   path.AsStdString());
     return {};
 }
 

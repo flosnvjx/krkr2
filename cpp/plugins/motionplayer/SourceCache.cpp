@@ -177,31 +177,43 @@ namespace {
 
         std::vector<ttstr> candidates;
         const auto sourcePath = motion::detail::widen(source);
-        pushGraphicCandidates(candidates, sourcePath);
-        motion::detail::appendEmbeddedSourceCandidates(snapshot, source,
-                                                       candidates);
-        for(const auto &alias : snapshot.resourceAliases) {
-            const auto embeddedBase = ttstr{ TJS_W("psb://") } +
-                motion::detail::widen(alias) + TJS_W("/") + sourcePath;
-            pushGraphicCandidates(candidates, embeddedBase);
-        }
-
         const auto lastSlash = source.rfind('/');
         const auto baseName = lastSlash == std::string::npos
             ? source
             : source.substr(lastSlash + 1);
-        for(const auto &[resPath, ignored] : snapshot.resourcesByPath) {
-            (void)ignored;
-            const auto targetSuffix = "/" + baseName + "/pixel";
-            if(resPath.size() >= targetSuffix.size() &&
-               resPath.compare(resPath.size() - targetSuffix.size(),
-                               targetSuffix.size(), targetSuffix) == 0) {
-                for(const auto &alias : snapshot.resourceAliases) {
-                    const auto psbPath = ttstr{ TJS_W("psb://") } +
+
+        const auto appendCandidatesForSnapshot =
+            [&](const motion::detail::MotionSnapshot &snap) {
+                pushGraphicCandidates(candidates, sourcePath);
+                motion::detail::appendEmbeddedSourceCandidates(snap, source,
+                                                               candidates);
+                for(const auto &alias : snap.resourceAliases) {
+                    const auto embeddedBase = ttstr{ TJS_W("psb://") } +
                         motion::detail::widen(alias) + TJS_W("/") +
-                        motion::detail::widen(resPath);
-                    pushGraphicCandidates(candidates, psbPath);
+                        sourcePath;
+                    pushGraphicCandidates(candidates, embeddedBase);
                 }
+                for(const auto &[resPath, ignored] : snap.resourcesByPath) {
+                    (void)ignored;
+                    const auto targetSuffix = "/" + baseName + "/pixel";
+                    if(resPath.size() >= targetSuffix.size() &&
+                       resPath.compare(resPath.size() - targetSuffix.size(),
+                                       targetSuffix.size(), targetSuffix) ==
+                           0) {
+                        for(const auto &alias : snap.resourceAliases) {
+                            const auto psbPath = ttstr{ TJS_W("psb://") } +
+                                motion::detail::widen(alias) + TJS_W("/") +
+                                motion::detail::widen(resPath);
+                            pushGraphicCandidates(candidates, psbPath);
+                        }
+                    }
+                }
+            };
+
+        appendCandidatesForSnapshot(snapshot);
+        for(const auto &attached : snapshot.attachedSnapshots) {
+            if(attached) {
+                appendCandidatesForSnapshot(*attached);
             }
         }
 

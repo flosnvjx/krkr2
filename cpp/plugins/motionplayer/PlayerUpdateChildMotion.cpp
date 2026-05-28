@@ -181,11 +181,9 @@ namespace motion {
                                     // child+1128 (_cachedTotalFrames)
                                     double loopEnd = child._loopTime;
                                     if(loopEnd >= 0.0) {
-                                        double totalFrames =
-                                            child._cachedTotalFrames;
-                                        while(childTime >= totalFrames)
-                                            childTime = childTime -
-                                                totalFrames + loopEnd;
+                                        childTime = detail::wrapTimelineCurrentTimeValue(
+                                            childTime, child._cachedTotalFrames,
+                                            loopEnd);
                                     }
                                 }
                                 // Binary reads player+1128 directly (0x6BE4CC)
@@ -590,6 +588,7 @@ namespace motion {
             // even for inactive/non-visible nodes.
             if(auto *childP = mn.getChildPlayer()) {
                 auto &child = *childP;
+                const bool emoteLike = detail::isEmoteLikeMotion(*_runtime);
                 if(detail::logoSnapshotMarkEnabledForPath(motionPath) &&
                    motionPath.find("m2logo.mtn") != std::string::npos &&
                    currentTime >= 30.0 && currentTime <= 50.0) {
@@ -626,9 +625,10 @@ namespace motion {
                     //         v17+1952 = v10+1952 (third field — not mapped in
                     //         our arch)
                     cr.parentClipIndex = mn.parentClipIndex;
-                    // Binary 0x6BE280: if meshCombineEnabled, current node is
-                    // ancestor; otherwise, propagate stored ancestor.
-                    if(mn.meshCombineEnabled) {
+                    // e-mote 子 Player 自有 nodes[]；父树 node 下标不能写入子树。
+                    if(emoteLike) {
+                        cr.visibleAncestorIndex = -1;
+                    } else if(mn.meshCombineEnabled) {
                         cr.visibleAncestorIndex = static_cast<int>(i);
                     } else {
                         cr.visibleAncestorIndex = mn.visibleAncestorIndex;
@@ -637,13 +637,20 @@ namespace motion {
                     // child root
                     cr.forceVisible = mn.forceVisible;
                 }
-                // Step child: frameProgress + updateLayers (0x6BE2A4..0x6BE2AC)
-                // Binary calls both unconditionally (no guard). Child's node
-                // tree was eagerly built when its play/onFindMotion fired
-                // earlier in this loop (see 0x6BE41C eager chain) — the
-                // binary assumes nodes are already ready here.
-                child.frameProgress(_frameLastTime);
-                child.updateLayers();
+                // sdl3: emotenode::progress(tick) 就地递归，无子 Player 每帧全量
+                // updateLayers。e-mote 仅在 clip/src 变化或首帧时步进子 Player。
+                const bool runChildStep =
+                    !emoteLike || (mn.flags & 0x01) != 0 || child._queuing ||
+                    child._noUpdateYet;
+                if(runChildStep) {
+                    if(emoteLike) {
+                        child._clampedEvalTime = 0.0;
+                        child.frameProgress(0.0);
+                    } else {
+                        child.frameProgress(_frameLastTime);
+                    }
+                    child.updateLayers();
+                }
             }
         }
     }

@@ -39,7 +39,7 @@ namespace motion {
         void setChara(ttstr v) { _player.setChara(v); }
         [[nodiscard]] ttstr getChara() const { return _player.getChara(); }
 
-        // SDL3 ref: motion property stores clip label; play() starts playback.
+        // motion 属性存 clip 名；play() 启动播放
         void setMotion(ttstr v);
         [[nodiscard]] ttstr getMotion() const;
 
@@ -225,8 +225,11 @@ namespace motion {
         void skip();
         void skipToSync();
         void addPlayCallback();
-        void pass(double dt);
+        void pass();
         void progress(double dt);
+        static tjs_error progressCompat(tTJSVariant *result, tjs_int numparams,
+                                        tTJSVariant **param,
+                                        iTJSDispatch2 *objthis);
 
         void setOuterForce(double x, double y);
         void setOuterForce(ttstr label, double x, double y,
@@ -253,8 +256,8 @@ namespace motion {
 
         // EmotePlayer-specific state (not on Player)
         tTJSVariant _module;
-        ttstr _storageKey; // motionKey: PSB cache path (SDL3 ref)
-        ttstr _clipLabel; // motion: clip/timeline label (SDL3 ref)
+        ttstr _storageKey; // motionKey: PSB 缓存路径
+        ttstr _clipLabel; // motion: clip/timeline 名
         bool _useD3D = false;
         bool _smoothing = true;
         double _meshDivisionRatio = 1.0;
@@ -270,7 +273,7 @@ namespace motion {
         bool _opengl = false;
         bool _visible = true;
         bool _playCallback = false;
-        // SDL3 ref: isSelfClear — true for motionKey/single-cache draw clear
+        // 参考 sdl3 isSelfClear：motionKey/single-cache 时 draw 前 clear
         // mode.
         bool _isSelfClear = true;
 

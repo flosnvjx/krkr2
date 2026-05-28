@@ -18,7 +18,7 @@
 
 namespace {
 
-    enum class Sdl3PlayMode {
+    enum class EmotePlayMode {
         None,
         MotionKey, // _currentfile != nullptr
         SingleCache, // cache.size()==1 && isMotion
@@ -72,7 +72,7 @@ namespace {
     }
 
     bool isMotionModule(const tTJSVariant &module) {
-        // SDL3 ref: emotefile::isMotion — false=emote, true=motion.
+        // 参考 sdl3/（不编译）: emotefile::isMotion — false=emote, true=motion.
         // libkrkr2.so PSB root type: 0=motion, 1=emote.
         const auto snapshot = motion::detail::lookupModuleSnapshot(module);
         if(!snapshot || !snapshot->root) {
@@ -154,7 +154,7 @@ namespace motion {
     tTJSVariant EmotePlayer::getModule() const { return _module; }
 
     void EmotePlayer::setMotionKey(ttstr v) {
-        // SDL3 ref: sdl3/emoteplayerclass.cpp set_motionKey()
+        // 参考 sdl3/emoteplayerclass.cpp（不编译）: set_motionKey()
         _storageKey = v;
         _player.bindMotionModuleKey(v);
         const auto loaded = _player.getProject();
@@ -165,7 +165,7 @@ namespace motion {
     }
 
     void EmotePlayer::setMotion(ttstr v) {
-        // SDL3 ref: motion property is storage only; play() starts animation.
+        // motion 属性仅存 clip 名；play() 启动播放
         _clipLabel = v;
         _modified = true;
     }
@@ -275,7 +275,7 @@ namespace motion {
         if(rule.Type() != tvtVoid) {
             _player.setMetadata(rule);
         }
-        _player.initPhysics();
+        _player.initPhysics(rule);
         _modified = true;
     }
 
@@ -595,11 +595,10 @@ namespace motion {
 
     void EmotePlayer::fadeInTimeline(ttstr label, double duration,
                                      tjs_int flags) {
-        // SDL3 ref: zero-duration fadeIn is equivalent to playTimeline().
+        // 参考 sdl3：零时长 fadeIn 等价于 playTimeline
         if(duration <= 0.0) {
             LOGGER->debug(
-                "EmotePlayer::fadeInTimeline({}, {}): using SDL3 shortcut "
-                "(playTimeline)",
+                "EmotePlayer::fadeInTimeline({}, {}): zero-duration → playTimeline",
                 label.AsStdString(), duration);
             playTimeline(label, flags);
             return;
@@ -610,11 +609,10 @@ namespace motion {
 
     void EmotePlayer::fadeOutTimeline(ttstr label, double duration,
                                       tjs_int flags) {
-        // SDL3 ref: zero-duration fadeOut is equivalent to stopTimeline().
+        // 参考 sdl3：零时长 fadeOut 等价于 stopTimeline
         if(duration <= 0.0) {
             LOGGER->debug(
-                "EmotePlayer::fadeOutTimeline({}, {}): using SDL3 shortcut "
-                "(stopTimeline)",
+                "EmotePlayer::fadeOutTimeline({}, {}): zero-duration → stopTimeline",
                 label.AsStdString(), duration);
             stopTimeline(label);
             return;
@@ -633,8 +631,7 @@ namespace motion {
     }
 
     bool EmotePlayer::play(ttstr label, tjs_int flags) {
-        // SDL3 reference: sdl3/emoteplayerclass.cpp EmotePlayer::play()
-        // Three startup modes:
+        // 参考 sdl3/emoteplayerclass.cpp（不编译）: EmotePlayer::play() 三种启动模式
         //   1) motionKey bound module
         //   2) single cached motion PSB (chara+motion path)
         //   3) multi-cache composite (addEmoteFile — not fully ported)
@@ -642,7 +639,7 @@ namespace motion {
             label = _clipLabel;
         }
 
-        Sdl3PlayMode mode = Sdl3PlayMode::None;
+        EmotePlayMode mode = EmotePlayMode::None;
         ttstr clipLookupLabel;
         bool selfClear = true;
         auto &rm = _player.getResourceManagerNative();
@@ -655,7 +652,7 @@ namespace motion {
                 }
             }
             if(_player.hasActiveMotion()) {
-                mode = Sdl3PlayMode::MotionKey;
+                mode = EmotePlayMode::MotionKey;
                 selfClear = true;
                 const ttstr metaMotion =
                     readMetadataBaseField(module, TJS_W("motion"));
@@ -668,10 +665,10 @@ namespace motion {
             }
         }
 
-        if(mode == Sdl3PlayMode::None) {
+        if(mode == EmotePlayMode::None) {
             const auto cached = rm.uniqueCachedModules();
             if(cached.size() == 1 && isMotionModule(cached.front().module)) {
-                mode = Sdl3PlayMode::SingleCache;
+                mode = EmotePlayMode::SingleCache;
                 selfClear = true;
                 const auto &entry = cached.front();
                 if(!_player.hasActiveMotion()) {
@@ -686,9 +683,10 @@ namespace motion {
                     entry.key, _player.getChara().AsStdString(),
                     clipLookupLabel.AsStdString());
             } else if(!cached.empty()) {
-                // SDL3 ref: final else branch — also covers single emote cache.
-                mode = Sdl3PlayMode::MultiCache;
+                // 参考 sdl3：multi-cache 分支 — 选主 PSB 后交叉链接其余缓存项
+                mode = EmotePlayMode::MultiCache;
                 selfClear = false;
+                std::shared_ptr<detail::MotionSnapshot> primarySnapshot;
                 for(const auto &entry : cached) {
                     const ttstr metaChara =
                         readMetadataBaseField(entry.module, TJS_W("chara"));
@@ -697,16 +695,36 @@ namespace motion {
                     if(metaChara.IsEmpty() || metaMotion.IsEmpty()) {
                         continue;
                     }
-                    _player.bindMotionModuleKey(ttstr(entry.key.c_str()));
-                    _storageKey = ttstr(entry.key.c_str());
-                    _module = entry.module;
-                    clipLookupLabel = metaMotion;
-                    LOGGER->warn(
-                        "EmotePlayer::play mode=MultiCache key={}: selected "
-                        "first metadata match; addEmoteFile composite linking "
-                        "not implemented (SDL3 ref)",
-                        entry.key);
-                    break;
+                    const auto snapshot =
+                        detail::lookupModuleSnapshot(entry.module);
+                    if(!snapshot) {
+                        continue;
+                    }
+                    if(!primarySnapshot) {
+                        primarySnapshot = snapshot;
+                        _player.bindMotionModuleKey(ttstr(entry.key.c_str()));
+                        _storageKey = ttstr(entry.key.c_str());
+                        _module = entry.module;
+                        clipLookupLabel = metaMotion;
+                        LOGGER->debug(
+                            "EmotePlayer::play mode=MultiCache primary key={} "
+                            "chara={} motion={}",
+                            entry.key, metaChara.AsStdString(),
+                            metaMotion.AsStdString());
+                    }
+                }
+                if(primarySnapshot) {
+                    for(const auto &entry : cached) {
+                        const auto snapshot =
+                            detail::lookupModuleSnapshot(entry.module);
+                        if(snapshot && snapshot.get() != primarySnapshot.get()) {
+                            _player.addEmoteFile(snapshot);
+                        }
+                    }
+                    LOGGER->debug(
+                        "EmotePlayer::play mode=MultiCache: linked {} attached "
+                        "snapshot(s)",
+                        primarySnapshot->attachedSnapshots.size());
                 }
             }
         }
@@ -715,13 +733,13 @@ namespace motion {
             if(label.IsEmpty()) {
                 LOGGER->error(
                     "EmotePlayer::play(): no module/motion resolved in any "
-                    "SDL3 play mode");
+                    "EmotePlayer play mode");
                 throw std::runtime_error(
                     "motionplayer: EmotePlayer.play() could not resolve motion "
                     "module");
             }
             clipLookupLabel = label;
-            LOGGER->warn("EmotePlayer::play: no SDL3 mode matched; fallback to "
+            LOGGER->warn("EmotePlayer::play: no play mode matched; fallback to "
                          "playLabel={}",
                          label.AsStdString());
         }
@@ -730,7 +748,7 @@ namespace motion {
         _progress = 0.0;
         _isSelfClear = selfClear;
 
-        // SDL3: clockPassed=0; _animating/_playing/_allplaying=true
+        // 参考 sdl3：play 开始时重置 tick / playing 状态
         _player.setTickCount(0.0);
         _player.setFrameLoopTime(0.0);
         _player.setSpeed(true);
@@ -773,11 +791,10 @@ namespace motion {
     void EmotePlayer::addPlayCallback() { _playCallback = true; }
 
     void EmotePlayer::skip() {
-        // libkrkr2.so sub_66EB8C vs SDL3 TODO: skip jumps to sync point in SDL3
-        // skipToSync path; here we stop all timelines then seek sync.
+        // libkrkr2.so sub_66EB8C；参考 sdl3 skipToSync（不编译）
         LOGGER->debug(
-            "EmotePlayer::skip(): delegating to skipToSync() per SDL3 ref "
-            "(sdl3/emoteplayerclass.cpp skipToSync)");
+            "EmotePlayer::skip(): delegating to skipToSync() "
+            "(参考 sdl3/emoteplayerclass.cpp，不编译)");
         skipToSync();
     }
 
@@ -786,14 +803,17 @@ namespace motion {
         _modified = true;
     }
 
-    // Aligned to libkrkr2.so sub_6818B4 -> sub_6D2A54:
-    // after wrapper-side animators, EmotePlayer advances its owned Player and
-    // immediately updates layers/calcBounds.
-    void EmotePlayer::pass(double dt) {
-        // SDL3 ref: progress only when playing; libkrkr2.so always advances
-        // owned Player when pass/progress is called from EmotePlayer wrapper.
+    // Aligned to libkrkr2.so sub_6818B4 wrapper path:
+    // pass() is parameterless (manual.tjs / AffineSourceMotion sync); time
+    // advancement is progress(tickStep) called separately by the script.
+    void EmotePlayer::pass() {
+        _player.releaseSyncWait();
+        _modified = true;
+    }
+
+    void EmotePlayer::progress(double dt) {
         if(dt < 0.0 || dt > 60000.0) {
-            LOGGER->warn("EmotePlayer::pass({}): clamping abnormal dt to 0",
+            LOGGER->warn("EmotePlayer::progress({}): clamping abnormal dt to 0",
                          dt);
             dt = 0.0;
         }
@@ -802,7 +822,22 @@ namespace motion {
         _modified = true;
     }
 
-    void EmotePlayer::progress(double dt) { pass(dt); }
+    tjs_error EmotePlayer::progressCompat(tTJSVariant *, tjs_int numparams,
+                                          tTJSVariant **param,
+                                          iTJSDispatch2 *objthis) {
+        auto *self =
+            ncbInstanceAdaptor<EmotePlayer>::GetNativeInstance(objthis, true);
+        if(!self) {
+            return TJS_E_INVALIDOBJECT;
+        }
+
+        double delta = 0.0;
+        if(numparams > 0 && param[0] && param[0]->Type() != tvtVoid) {
+            delta = param[0]->AsReal();
+        }
+        self->progress(delta);
+        return TJS_S_OK;
+    }
 
     // Aligned to libkrkr2.so sub_672D58: routes by label to bust/h/parts
     void EmotePlayer::setOuterForce(double x, double y) {

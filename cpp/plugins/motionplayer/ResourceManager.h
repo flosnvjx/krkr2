@@ -22,8 +22,7 @@ namespace motion {
         void clearCache() const;
         tTJSVariant getLastLoadedModule() const;
         tTJSVariant findLoaded(ttstr path) const;
-        // SDL3 ref (ResourceManager::GetPlayerByName): try placed/raw/lzf
-        // paths.
+    // 参考 sdl3/ GetPlayerByName（不编译）: placed/raw/lzf 路径
         tTJSVariant findLoadedModule(ttstr path) const;
         tTJSVariant findSource(ttstr path) const;
         [[nodiscard]] std::size_t uniqueCachedModuleCount() const;
@@ -55,9 +54,11 @@ namespace motion {
             std::unordered_map<tjs_int, std::string> layerNamesById;
             std::unordered_set<tjs_int> usedLayerIds;
             tjs_int nextLayerId = 1;
+            tjs_int cacheSize = 20 * 1024 * 1024;
         };
 
         std::shared_ptr<State> _state;
-        inline static int _decryptSeed;
+        inline static int _decryptSeed = 0;
+        inline static tTJSVariantClosure _decryptFunc{};
     };
 } // namespace motion

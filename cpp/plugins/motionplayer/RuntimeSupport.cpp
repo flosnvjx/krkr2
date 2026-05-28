@@ -877,6 +877,8 @@ namespace motion::detail {
             const bool layerLike = pathContainsToken(path, "layer") ||
                 dictionaryHasKey(dic, "layer_id") ||
                 dictionaryHasKey(dic, "layer_type") ||
+                (dictionaryHasKey(dic, "label") &&
+                 dictionaryHasKey(dic, "frameList")) ||
                 (dictionaryHasKey(dic, "width") &&
                  dictionaryHasKey(dic, "height") &&
                  (dictionaryHasKey(dic, "left") ||
@@ -1042,6 +1044,69 @@ namespace motion::detail {
             snapshot.loopTimelines[clip.label] = clip.loop;
             snapshot.timelineLoopTimes[clip.label] = clip.loopTime;
             snapshot.timelineTotalFrames[clip.label] = clip.totalFrames;
+        }
+
+        void appendResolvedLayerReference(
+            const std::shared_ptr<PSB::IPSBValue> &item,
+            const MotionSnapshot &snapshot,
+            std::vector<std::shared_ptr<const PSB::PSBDictionary>> &out) {
+            if(auto layer =
+                   std::dynamic_pointer_cast<const PSB::PSBDictionary>(item)) {
+                out.push_back(layer);
+                return;
+            }
+            if(const auto num = psbNumber(item)) {
+                const int idx = static_cast<int>(*num);
+                if(idx >= 0 &&
+                   idx < static_cast<int>(snapshot.layerList.size())) {
+                    out.push_back(snapshot.layerList[static_cast<size_t>(idx)]);
+                }
+            }
+        }
+
+        // Emote motion clips store layer[] as node indices (参考 sdl3/emotefile
+        // emotemotion constructor); resolve to layer dicts after root layerList
+        // is populated.
+        void resolveClipLayerReferences(MotionSnapshot &snapshot) {
+            for(auto &clip : snapshot.clipList) {
+                if(!clip.layerList.empty() || !clip.motionObject) {
+                    continue;
+                }
+
+                std::vector<std::shared_ptr<const PSB::PSBDictionary>> resolved;
+                if(const auto layers =
+                       dictionaryList(clip.motionObject, { "layer" })) {
+                    for(const auto &item : *layers) {
+                        appendResolvedLayerReference(item, snapshot, resolved);
+                    }
+                }
+
+                if(resolved.empty()) {
+                    if(const auto priorities =
+                           dictionaryList(clip.motionObject, { "priority" })) {
+                        for(const auto &priItem : *priorities) {
+                            const auto priDic =
+                                std::dynamic_pointer_cast<PSB::PSBDictionary>(
+                                    priItem);
+                            if(!priDic) {
+                                continue;
+                            }
+                            if(const auto content =
+                                   dictionaryList(priDic, { "content" })) {
+                                for(const auto &item : *content) {
+                                    appendResolvedLayerReference(
+                                        item, snapshot, resolved);
+                                }
+                            }
+                            if(!resolved.empty()) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                clip.layerList = std::move(resolved);
+            }
         }
 
         void scanValue(const std::shared_ptr<PSB::IPSBValue> &value,
@@ -1298,6 +1363,40 @@ namespace motion::detail {
         }
     }
 
+    std::shared_ptr<const PSB::PSBDictionary> resolveLayerDictionaryReference(
+        const std::shared_ptr<PSB::IPSBValue> &item,
+        const std::vector<std::shared_ptr<const PSB::PSBDictionary>> &layerList) {
+        if(auto layer =
+               std::dynamic_pointer_cast<const PSB::PSBDictionary>(item)) {
+            return layer;
+        }
+        if(const auto num = psbNumber(item)) {
+            const int idx = static_cast<int>(*num);
+            if(idx >= 0 && idx < static_cast<int>(layerList.size())) {
+                return layerList[static_cast<size_t>(idx)];
+            }
+        }
+        return nullptr;
+    }
+
+    void mergeAttachedSnapshotResources(MotionSnapshot &primary,
+                                        const MotionSnapshot &attached) {
+        for(const auto &alias : attached.resourceAliases) {
+            appendUnique(primary.resourceAliases, alias);
+        }
+        for(const auto &source : attached.sourceCandidates) {
+            appendUnique(primary.sourceCandidates, source);
+        }
+        for(const auto &[path, resource] : attached.resourcesByPath) {
+            primary.resourcesByPath.emplace(path, resource);
+        }
+        if(attached.file) {
+            PSB::registerRootResources(
+                { widen(attached.path), TVPExtractStorageName(widen(attached.path)) },
+                *attached.file);
+        }
+    }
+
     std::shared_ptr<MotionSnapshot>
     loadMotionSnapshot(const ttstr &path, const tjs_int decryptSeed) {
         const auto file = loadPSBFile(path, decryptSeed);
@@ -1333,6 +1432,7 @@ namespace motion::detail {
         std::vector<std::string> pathParts;
         scanValue(std::const_pointer_cast<PSB::PSBDictionary>(root), pathParts,
                   *snapshot);
+        resolveClipLayerReferences(*snapshot);
         collectControlMetadata(*snapshot);
         collectRootResources(root, *snapshot);
         if(logoChainTraceEnabled(snapshot)) {
@@ -1470,6 +1570,20 @@ namespace motion::detail {
         return it != snapshotRegistry().end() ? it->second : nullptr;
     }
 
+    void unregisterModuleSnapshot(const tTJSVariant &module) {
+        if(module.Type() != tvtObject || module.AsObjectNoAddRef() == nullptr) {
+            return;
+        }
+
+        std::lock_guard lock(snapshotRegistryMutex());
+        snapshotRegistry().erase(module.AsObjectNoAddRef());
+    }
+
+    void clearModuleSnapshots() {
+        std::lock_guard lock(snapshotRegistryMutex());
+        snapshotRegistry().clear();
+    }
+
     tTJSVariant makeArray(const std::vector<tTJSVariant> &items) {
         iTJSDispatch2 *array = TJSCreateArrayObject();
         static tjs_uint addHint = 0;
@@ -1561,16 +1675,8 @@ namespace motion::detail {
                 continue;
             }
 
-            // Aligned to libkrkr2.so Player_progress_inner (0x6C106C):
-            // loopTime >= 0: wrap using currentTime = currentTime + loopTime -
-            // lastTime loopTime < 0: stop at end
-            if(state.loopTime >= 0.0) {
-                while(state.currentTime >= state.totalFrames) {
-                    state.currentTime =
-                        state.currentTime + state.loopTime - state.totalFrames;
-                }
-            } else {
-                state.currentTime = state.totalFrames;
+            if(!wrapTimelineCurrentTime(state.currentTime, state.totalFrames,
+                                        state.loopTime)) {
                 state.playing = false;
                 // Aligned to libkrkr2.so Player_dispatchEvents (0x6C4490):
                 // Queue onSync event when timeline stops (playing→false)

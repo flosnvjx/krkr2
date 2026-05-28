@@ -732,9 +732,9 @@ namespace motion {
         // Visibility bitmask: which nodeTypes can render
         // Non-emote: 6145 = 0x1801 → nodeTypes 0, 11, 12
         // Emote:     6153 = 0x1809 → nodeTypes 0, 3, 11, 12
-        // Aligned to sub_6BD8DC (0x6BD8DC): visibility bitmask depends on emote
-        // mode.
-        const int visBitmask = _runtime->isEmoteMode ? 6153 : 6145;
+        // e-mote3 PSB type=0 仍走 motion 位掩码；有 variableLabels 时按 emote 处理。
+        const bool emoteLikeMotion = detail::isEmoteLikeMotion(*_runtime);
+        const int visBitmask = emoteLikeMotion ? 6153 : 6145;
         for(size_t i = 1; i < nodes.size(); ++i) {
             auto &node = nodes[i];
 
@@ -759,8 +759,20 @@ namespace motion {
             if(node.activeSlot().done) {
                 node.drawFlag = false;
             } else if(node.stencilType == 0) {
-                // node+52 == 0 → invisible (0x6BD958)
-                node.drawFlag = false;
+                const bool emoteDrawableStencilZero =
+                    _runtime->activeMotion &&
+                    !_runtime->activeMotion->variableLabels.empty() &&
+                    node.hasSource;
+                if(!emoteDrawableStencilZero) {
+                    node.drawFlag = false;
+                } else if(!node.accumulated.active) {
+                    node.drawFlag = false;
+                } else if(node.forceVisible ||
+                          (visBitmask & (1 << node.nodeType)) != 0) {
+                    node.drawFlag = node.hasSource;
+                } else {
+                    node.drawFlag = true;
+                }
             } else if(!node.accumulated.active) {
                 node.drawFlag = false;
             } else if(node.forceVisible ||

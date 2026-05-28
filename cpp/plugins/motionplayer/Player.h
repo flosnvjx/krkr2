@@ -253,7 +253,7 @@ namespace motion {
         bool getBusy() const { return _busy; }
 
         // --- Methods ---
-        void initPhysics();
+        void initPhysics(tTJSVariant metadata);
         tTJSVariant serialize();
         void unserialize(tTJSVariant data);
         void setEmoteCoord(double x, double y, double transition = 0.0,
@@ -286,7 +286,9 @@ namespace motion {
         // Aligned to libkrkr2.so: EmoteObject_init (sub_67DBAC) sets Player's
         // activeMotion directly from loaded PSB data without file I/O.
         void loadFromSnapshot(std::shared_ptr<detail::MotionSnapshot> snapshot);
-        // SDL3 ref (EmotePlayer::set_motionKey): bind cached PSB module only.
+        // 参考 sdl3 emotefile::addEmoteFile（不编译）：MultiCache 复合链接
+        void addEmoteFile(std::shared_ptr<detail::MotionSnapshot> snapshot);
+        // 参考 sdl3 set_motionKey（不编译）：仅绑定已缓存 PSB 模块
         void bindMotionModuleKey(ttstr storageKey);
         [[nodiscard]] bool hasActiveMotion() const {
             return _runtime && _runtime->activeMotion != nullptr;
@@ -378,6 +380,10 @@ namespace motion {
         void onFindMotion(ttstr name, int flags = 0);
         bool playMotionLike_0x6B2284(ttstr label, tjs_int flags);
         void progressMsLike_0x6D2A54(double deltaMs);
+        // sdl3/emoteplayerclass.cpp::progress + emotemotion::progress(0) 路径。
+        void progressEmoteLike_sdl3(double deltaMs, iTJSDispatch2 *objthis);
+        void updateLayersEmoteLike_sdl3();
+        void dispatchPendingMotionEvents(iTJSDispatch2 *objthis);
         void setParentPlayerLike_0x6B1ABC(Player *parentPlayer) {
             _parentPlayer = parentPlayer;
         }
@@ -417,7 +423,7 @@ namespace motion {
         tTJSVariant motionList();
         void emoteEdit(tTJSVariant args);
 
-        // Public accessor for EmotePlayer SDL3 play-mode dispatch.
+        // EmotePlayer play 模式分发用
         ResourceManager &getResourceManagerNative() {
             return _resourceManagerNative;
         }
@@ -454,6 +460,14 @@ namespace motion {
         // Aligned to libkrkr2.so Player_initNonEmoteMotion (0x6B365C).
         // This is the native/LLDB init_motion stage boundary.
         void initNonEmoteMotionLike_0x6B365C(std::uint32_t playFlags);
+        // Aligned to libkrkr2.so Player_initEmoteMotion: emote (type=1) path
+        // still runs buildNodeTree + initVariables before draw/progress.
+        void initEmoteMotionLike_0x6B3A8C(std::uint32_t playFlags);
+        void seedEmoteVariableDefaultsLike_sdl3();
+        void syncParameterEntriesFromVariablesLike_sdl3();
+        void logEmoteInitDiagnosticsOnce();
+        void logEmoteFirstEvalDiagnosticsOnce();
+        void loadMotionParameterTableLike_sdl3();
         // Aligned to libkrkr2.so Player_buildNodeTree (0x6B51F0). Called
         // eagerly from play/onFindMotion paths; the binary has no lazy gate.
         void buildNodeTree();

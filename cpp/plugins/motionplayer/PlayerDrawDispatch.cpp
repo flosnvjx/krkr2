@@ -230,6 +230,10 @@ namespace motion {
 #if defined(KRKR2_WASMTIME_HEADLESS)
             renderTrace.setRoute("prepare_empty");
 #endif
+            LOGGER->warn(
+                "Player::drawCompat: prepareRenderItems returned empty for "
+                "path={} nodes={}",
+                motionPath, _runtime ? _runtime->nodes.size() : 0);
             detail::logoChainTraceCheck(
                 motionPath, "drawCompat.dispatch", "0x6D5FB8", _clampedEvalTime,
                 "prepareRenderItems should produce a render list",

@@ -13,13 +13,11 @@ namespace motion {
         ensureMotionLoaded();
         if(!_runtime || !_runtime->activeMotion) {
             LOGGER->warn(
-                "Player::skipToSync(): no active motion (SDL3 ref: requires "
-                "_currmotion)");
+                "Player::skipToSync(): no active motion");
             return;
         }
 
-        // SDL3 ref: sdl3/emoteplayerclass.cpp skipToSync() sets clockPassed to
-        // emotefile::getSyncTime(). We approximate sync time from timeline
+        // 参考 sdl3/emoteplayerclass.cpp（不编译）: skipToSync / getSyncTime
         // metadata because libkrkr2.so stores it separately from timeline end.
         double syncTime = 0.0;
         for(const auto &[label, binding] :
@@ -35,7 +33,7 @@ namespace motion {
         }
         LOGGER->debug(
             "Player::skipToSync(): seeking timelines to syncTime={:.3f} "
-            "(SDL3 ref: getSyncTime(); libkrkr2.so may differ)",
+            "(参考 sdl3 getSyncTime；libkrkr2.so 可能不同)",
             syncTime);
 
         for(auto &[_, state] : _runtime->timelines) {
@@ -138,7 +136,7 @@ namespace motion {
         if(const auto controlIt =
                _runtime->activeMotion->timelineControlByLabel.find(key);
            controlIt != _runtime->activeMotion->timelineControlByLabel.end()) {
-            // SDL3 ref: sdl3/emoteplayerclass.cpp getLoopTimeline()
+            // 参考 sdl3/emoteplayerclass.cpp（不编译）: getLoopTimeline()
             // returns timelineControl.lastTime < 0.
             return controlIt->second.lastTime < 0.0;
         }
@@ -186,7 +184,7 @@ namespace motion {
                _runtime->activeMotion->timelineControlByLabel.end()) {
                 const auto &binding = controlIt->second;
                 if(binding.loopEnd >= binding.loopBegin) {
-                    // SDL3 ref: loopEnd - loopBegin + 1
+                    // 参考 sdl3: loopEnd - loopBegin + 1
                     return static_cast<tjs_int>(binding.loopEnd -
                                                 binding.loopBegin + 1.0);
                 }

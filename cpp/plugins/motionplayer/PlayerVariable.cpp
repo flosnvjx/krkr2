@@ -310,6 +310,30 @@ namespace motion {
         }
     }
 
+    void Player::syncParameterEntriesFromVariablesLike_sdl3() {
+        if(!_runtime) {
+            return;
+        }
+        for(auto &entry : _runtime->parameterEntries) {
+            if(entry.id.empty()) {
+                continue;
+            }
+            const double raw = initialParameterRawValueLike_0x6B1ABC(entry.id);
+            entry.value = normalizeParameterValueLike_0x6B1718(entry, raw);
+            entry.mode = 1;
+        }
+        for(auto &node : _runtime->nodes) {
+            if(node.parameterizeIndex < 0) {
+                continue;
+            }
+            if(static_cast<size_t>(node.parameterizeIndex) <
+               _runtime->parameterEntries.size()) {
+                node.parameterEntry = &_runtime->parameterEntries[static_cast<
+                    size_t>(node.parameterizeIndex)];
+            }
+        }
+    }
+
     void Player::writeEvalResultValueLike_0x6C4668(const std::string &label,
                                                    double value) {
         writeEvalResultValueLike_0x6C4668(label, 0, value);

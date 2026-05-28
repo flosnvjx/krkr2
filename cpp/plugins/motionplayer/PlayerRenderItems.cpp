@@ -8,6 +8,32 @@ using namespace motion::internal;
 
 namespace {
 
+    // Detect parent/child Player cycles while merging nested motion render lists.
+    thread_local std::unordered_set<motion::Player *> gActivePrepareRenderPlayers;
+
+    class PrepareRenderPlayerScope {
+    public:
+        explicit PrepareRenderPlayerScope(motion::Player *player) :
+            _player(player) {
+            if(_player) {
+                _active = gActivePrepareRenderPlayers.insert(_player).second;
+            }
+        }
+        ~PrepareRenderPlayerScope() {
+            if(_player && _active) {
+                gActivePrepareRenderPlayers.erase(_player);
+            }
+        }
+        PrepareRenderPlayerScope(const PrepareRenderPlayerScope &) = delete;
+        PrepareRenderPlayerScope &
+        operator=(const PrepareRenderPlayerScope &) = delete;
+        bool active() const { return _active; }
+
+    private:
+        motion::Player *_player = nullptr;
+        bool _active = false;
+    };
+
     inline std::array<std::uint32_t, 4>
     copyPackedColorsFromBytes(const uint8_t (&colorBytes)[16]) {
         std::array<std::uint32_t, 4> packedColors{};
@@ -37,6 +63,10 @@ namespace motion {
             _boundsMinY = 0.0;
             _boundsMaxX = 0.0;
             _boundsMaxY = 0.0;
+            return;
+        }
+        PrepareRenderPlayerScope selfScope(this);
+        if(!selfScope.active()) {
             return;
         }
         const auto motionPath = _runtime && _runtime->activeMotion
@@ -189,8 +219,18 @@ namespace motion {
 
         for(size_t ni = 1; ni < _runtime->nodes.size(); ++ni) {
             auto &node = _runtime->nodes[ni];
+            if(detail::isEmoteLikeMotion(*_runtime)) {
+                break;
+            }
             if(node.nodeType == 3) {
                 if(auto *child = node.getChildPlayer()) {
+                    if(gActivePrepareRenderPlayers.count(child) != 0) {
+                        continue;
+                    }
+                    PrepareRenderPlayerScope childScope(child);
+                    if(!childScope.active()) {
+                        continue;
+                    }
                     child->calcBounds();
                     mergeBounds(child->_boundsMinX, child->_boundsMinY,
                                 child->_boundsMaxX, child->_boundsMaxY);
@@ -229,6 +269,10 @@ namespace motion {
         if(!_runtime || !_runtime->activeMotion) {
             return;
         }
+        PrepareRenderPlayerScope selfScope(this);
+        if(!selfScope.active()) {
+            return;
+        }
 
         // Aligned to sub_6C2334 top: clear every node's drawnThisFrame
         // (node+1944) before rebuilding mainList, so downstream consumers
@@ -241,10 +285,11 @@ namespace motion {
         auto &entries = _runtime->preparedRenderItems;
         const auto &nodes = _runtime->nodes;
         const auto motionPath = _runtime->activeMotion->path;
-        const int bitmask = _runtime->isEmoteMode ? 5193 : 5185;
+        const bool emoteLikePrepare = detail::isEmoteLikeMotion(*_runtime);
+        const int bitmask = emoteLikePrepare ? 5193 : 5185;
         const auto &dam = _runtime->drawAffineMatrix;
         std::unordered_set<int> requiredGroupNodeIndices;
-        // SDL3 ref: child motion nodes live in the child player's own nodeList;
+        // 参考 sdl3（不编译）：子 motion 节点在子 Player 的 nodeList
         // merged child preparedRenderItems keep foreign nodeIndex values and
         // must not be indexed through this player's nodes[] vector.
         const auto isLocalPreparedItem =
@@ -254,7 +299,7 @@ namespace motion {
             return entry.nativeLifetimeOwner == nullptr ||
                 entry.nativeLifetimeOwner == runtime;
         };
-        const auto tryGetLocalNode =
+        const         auto tryGetLocalNode =
             [&nodes](int nodeIndex) -> const detail::MotionNode * {
             if(nodeIndex < 0 ||
                static_cast<size_t>(nodeIndex) >= nodes.size()) {
@@ -263,16 +308,48 @@ namespace motion {
             return &nodes[static_cast<size_t>(nodeIndex)];
         };
 
+        auto climbVisibleAncestorChain =
+            [&](int startNodeIndex, auto &&visit) {
+                int ancestorIndex = startNodeIndex;
+                for(int guard = 0;
+                    ancestorIndex >= 0 && guard < 256; ++guard) {
+                    const detail::MotionNode *ancestorNode =
+                        tryGetLocalNode(ancestorIndex);
+                    if(!ancestorNode) {
+                        break;
+                    }
+                    visit(ancestorIndex, *ancestorNode);
+                    const int nextIndex = ancestorNode->visibleAncestorIndex;
+                    if(nextIndex == ancestorIndex) {
+                        break;
+                    }
+                    ancestorIndex = nextIndex;
+                }
+            };
+
         auto appendChildEntriesAtCurrentNode = [&](Player *child,
                                                    bool nodePriorDraw) {
             if(!child || !child->_runtime) {
+                return;
+            }
+            if(gActivePrepareRenderPlayers.count(child) != 0) {
+                LOGGER->warn(
+                    "appendPreparedRenderItems: skip cyclic child Player "
+                    "motion={}",
+                    child->_runtime->activeMotion
+                        ? child->_runtime->activeMotion->path
+                        : std::string("<none>"));
                 return;
             }
             child->_renderItemInheritedFlag18 =
                 _renderItemInheritedFlag18 || nodePriorDraw;
             const auto savedChildDrawAffine = child->_runtime->drawAffineMatrix;
             child->_runtime->drawAffineMatrix = dam;
-            child->prepareRenderItems(inheritedFlag18 || (_priorDraw != 0.0));
+            // Never call child->prepareRenderItems here: it re-sorts/composites
+            // at every nesting level (O(N^depth) on NEKOPARA face_parts).
+            // Root prepareRenderItems sorts once after all merges.
+            child->_runtime->preparedRenderItems.clear();
+            child->appendPreparedRenderItems();
             child->_runtime->drawAffineMatrix = savedChildDrawAffine;
             auto &childEntries = child->_runtime->preparedRenderItems;
             if(detail::logoSnapshotMarkEnabledForPath(motionPath) &&
@@ -310,8 +387,7 @@ namespace motion {
                            std::make_move_iterator(childEntries.end()));
             LOGGER->debug(
                 "appendPreparedRenderItems: merged {} child render items "
-                "(foreign nodeIndex space; SDL3 ref: child motion renders in "
-                "own emotemotion context)",
+                "(foreign nodeIndex space; 参考 sdl3 子 motion 独立渲染上下文)",
                 childEntries.size());
             detail::logoChainTraceLogf(motionPath, "prepare.childMerge",
                                        "0x6C2334/0x6D4F00", _clampedEvalTime,
@@ -432,29 +508,23 @@ namespace motion {
             // pointer, allocating that synthetic ancestor item on demand even
             // when the ancestor itself has no source-backed render item.
             if(node.visibleAncestorIndex >= 0 &&
-               node.visibleAncestorIndex < static_cast<int>(nodes.size()) &&
-               node.visibleAncestorIndex != node.index) {
+               node.visibleAncestorIndex != node.index &&
+               tryGetLocalNode(node.visibleAncestorIndex) != nullptr) {
                 requiredGroupNodeIndices.insert(node.visibleAncestorIndex);
             }
 
-            for(int ancestorIndex =
-                    (node.visibleAncestorIndex >= 0 &&
-                     node.visibleAncestorIndex < static_cast<int>(nodes.size()))
-                    ? nodes[node.visibleAncestorIndex].visibleAncestorIndex
-                    : -1;
-                ancestorIndex >= 0 &&
-                ancestorIndex < static_cast<int>(nodes.size());) {
-                const auto &ancestor = nodes[ancestorIndex];
-                const bool isSpecialCompositeParent =
-                    ancestor.nodeType == 12 && (ancestor.stencilType & 4) != 0;
-                if(isSpecialCompositeParent) {
-                    requiredGroupNodeIndices.insert(ancestorIndex);
-                }
-                const int nextAncestorIndex = ancestor.visibleAncestorIndex;
-                if(nextAncestorIndex == ancestorIndex) {
-                    break;
-                }
-                ancestorIndex = nextAncestorIndex;
+            if(const detail::MotionNode *ancestorNode =
+                   tryGetLocalNode(node.visibleAncestorIndex)) {
+                climbVisibleAncestorChain(ancestorNode->visibleAncestorIndex,
+                                          [&](int ancestorIndex,
+                                              const detail::MotionNode &ancestor) {
+                    const bool isSpecialCompositeParent =
+                        ancestor.nodeType == 12 &&
+                        (ancestor.stencilType & 4) != 0;
+                    if(isSpecialCompositeParent) {
+                        requiredGroupNodeIndices.insert(ancestorIndex);
+                    }
+                });
             }
         }
 
@@ -463,14 +533,18 @@ namespace motion {
             if(!node.accumulated.active)
                 continue;
             if(!_preview) {
-                if(node.nodeType == 3) {
-                    appendChildEntriesAtCurrentNode(node.getChildPlayer(),
-                                                    node.priorDraw != 0);
-                } else if(node.nodeType == 4) {
-                    const int particleCount = node.getParticleCount();
-                    for(int pi = 0; pi < particleCount; ++pi) {
-                        appendChildEntriesAtCurrentNode(
-                            node.getParticleChild(pi), node.priorDraw != 0);
+                // sdl3: e-mote 单棵树 walk；不 libkrkr2 式 nodeType=3 子 Player
+                // prepare 合并（NEKOPARA 頭部変形基礎 会触发数百次子 prepare）。
+                if(!emoteLikePrepare) {
+                    if(node.nodeType == 3) {
+                        appendChildEntriesAtCurrentNode(node.getChildPlayer(),
+                                                        node.priorDraw != 0);
+                    } else if(node.nodeType == 4) {
+                        const int particleCount = node.getParticleCount();
+                        for(int pi = 0; pi < particleCount; ++pi) {
+                            appendChildEntriesAtCurrentNode(
+                                node.getParticleChild(pi), node.priorDraw != 0);
+                        }
                     }
                 }
             }
@@ -859,6 +933,9 @@ namespace motion {
             }
             for(int ancestorIndex = childEntry.visibleAncestorIndex;
                 ancestorIndex >= 0;) {
+                if(!tryGetLocalNode(ancestorIndex)) {
+                    break;
+                }
                 const auto parentIt = entryIndexByNode.find(ancestorIndex);
                 if(parentIt == entryIndexByNode.end()) {
                     break;
