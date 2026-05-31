@@ -123,6 +123,27 @@ var data = motion_manager.load("path/to/chara.psb");
 
 MultiCache（如 `a.psb:b.psb`）由 `splitStorage` 解析，C++ 侧 `EmotePlayer::play` 进入 `MultiCache` 模式并 `addEmoteFile` 交叉链接。
 
+### 2.1 PSB 解析参考 JSON（测试资产）
+
+仓库内有一份 **PSB 二进制经 `psbfile` 插件导出后的完整 JSON**，与 C++ `emotefile` / `EmoteFileCore.cpp` 读入的字段一一对应，供调试、单测与其它 AI 助手对照结构，**不是**运行时加载格式。
+
+| 项 | 值 |
+|----|-----|
+| **路径** | [`tests/test_files/emote/e-mote3.0バニラパジャマa.json`](../../../../tests/test_files/emote/e-mote3.0バニラパジャマa.json) |
+| **对应 PSB** | 同目录下同名 `.psb`（e-mote3.0 立绘样本） |
+| **根 `id`** | `"motion"`（PSB 容器类型；脚本仍按扩展名走 `EmotePlayer`） |
+| **metadata.base** | `chara: "all_parts"`, `motion: "全体構造"` — `EmotePlayer.chara` / `play()` 默认 clip |
+| **screenSize** | `width: 800`, `height: 1080`, `originX/Y: 0` — 映射 `emotefile::_screenSize` → `EmotePlayer::_limitArea` 与 FBO 分辨率 |
+| **source** | 贴图字典；每项含 `clip`, `width`/`height`, `originX`/`originY`, `pixel.__psb`（资源索引） |
+| **objects** | 角色/部件树与 `motion` 节点时间轴 |
+| **stereovisionProfile** 等 | 可选立体视参数 |
+
+**C++ 读取入口：** `ResourceManager::load` → `emotefile::load` → `EmoteFileCore.cpp`（`screenSize`、`source`、`objects`、`metadata` 等）。
+
+**单测：** `tests/unit-tests/plugins/motionplayer-dll.cpp` 可配合该 JSON 所在目录的 PSB 做加载/渲染回归。
+
+**临时调试：** `emoteplayerclass.cpp` 中 `kEmoteDebugDrawRedSquare == true` 时，每帧在 adaptor 子 layer 中央绘制红色方块，用于确认 `draw()` → `MainImage` → 屏幕合成链路；验证通过后改为 `false` 或删除。
+
 ---
 
 ## 3. TJS2 脚本 API 指南

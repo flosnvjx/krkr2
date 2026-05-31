@@ -9,9 +9,8 @@ using namespace emoteplayer;
 #define ENUM(n) Variant(#n, (int)n)
 #define PROPERTY(name) NCB_PROPERTY(name, get_##name, set_##name);
 
-NCB_REGISTER_SUBCLASS(ResourceManager)
-{
-    NCB_CONSTRUCTOR((iTJSDispatch2*, tjs_int));
+NCB_REGISTER_SUBCLASS(ResourceManager) {
+    NCB_CONSTRUCTOR((iTJSDispatch2 *, tjs_int));
     NCB_METHOD(load);
     NCB_METHOD(unload);
     NCB_METHOD(unloadAll);
@@ -19,17 +18,15 @@ NCB_REGISTER_SUBCLASS(ResourceManager)
     NCB_METHOD(setEmotePSBDecryptFunc);
 }
 
-NCB_REGISTER_SUBCLASS_DELAY(SeparateLayerAdaptor)
-{
-    NCB_CONSTRUCTOR((iTJSDispatch2*));
+NCB_REGISTER_SUBCLASS_DELAY(SeparateLayerAdaptor) {
+    NCB_CONSTRUCTOR((iTJSDispatch2 *));
     NCB_METHOD(assign);
     NCB_METHOD(clear);
     PROPERTY(absolute);
 }
 
-NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer)
-{
-    NCB_CONSTRUCTOR((ResourceManager*));
+NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer) {
+    NCB_CONSTRUCTOR((ResourceManager *));
     NCB_METHOD(serialize);
     NCB_METHOD(unserialize);
     NCB_METHOD(play);
@@ -76,13 +73,14 @@ NCB_REGISTER_SUBCLASS_DELAY(EmotePlayer)
     PROPERTY(motion);
     PROPERTY(chara);
     PROPERTY(variableKeys);
-    Variant("TimelinePlayFlagParallel", (int)EmotePlayer::TimelinePlayFlagParallel);
-    Variant("TimelinePlayFlagDifference", (int)EmotePlayer::TimelinePlayFlagDifference);
+    Variant("TimelinePlayFlagParallel",
+            (int)EmotePlayer::TimelinePlayFlagParallel);
+    Variant("TimelinePlayFlagDifference",
+            (int)EmotePlayer::TimelinePlayFlagDifference);
 }
 
-NCB_REGISTER_SUBCLASS_DELAY(Player)
-{
-    NCB_CONSTRUCTOR((ResourceManager*));
+NCB_REGISTER_SUBCLASS_DELAY(Player) {
+    NCB_CONSTRUCTOR((ResourceManager *));
     NCB_METHOD(serialize);
     NCB_METHOD(unserialize);
     NCB_METHOD(play);
@@ -132,8 +130,7 @@ NCB_REGISTER_SUBCLASS_DELAY(Player)
     PROPERTY(variableKeys);
 }
 
-NCB_REGISTER_CLASS(Motion)
-{
+NCB_REGISTER_CLASS(Motion) {
     NCB_METHOD(getD3DAvailable);
     NCB_PROPERTY(enableD3D, getEnableD3D, setEnableD3D);
     ENUM(MaskModeAlpha);
@@ -144,9 +141,9 @@ NCB_REGISTER_CLASS(Motion)
     NCB_SUBCLASS(SeparateLayerAdaptor, SeparateLayerAdaptor);
 }
 
-static void emoteplayer_init() { }
-    
-static void emoteplayer_done() { }
+static void emoteplayer_init() {}
+
+static void emoteplayer_done() {}
 
 NCB_PRE_REGIST_CALLBACK(emoteplayer_init);
 NCB_POST_UNREGIST_CALLBACK(emoteplayer_done);

@@ -12,15 +12,16 @@
 #include "tjsObject.h"
 
 namespace PSB {
-namespace {
+    namespace {
 
-    bool isNumericRealType(PSBObjType type) {
-        return (type >= PSBObjType::NumberN0 && type <= PSBObjType::NumberN8) ||
-               type == PSBObjType::Float0 || type == PSBObjType::Float ||
-               type == PSBObjType::Double;
-    }
+        bool isNumericRealType(PSBObjType type) {
+            return (type >= PSBObjType::NumberN0 &&
+                    type <= PSBObjType::NumberN8) ||
+                type == PSBObjType::Float0 || type == PSBObjType::Float ||
+                type == PSBObjType::Double;
+        }
 
-} // namespace
+    } // namespace
 
     PSBNumber::PSBNumber(PSBObjType objType, TJS::tTJSBinaryStream *stream) {
         switch(objType) {
@@ -269,8 +270,7 @@ namespace {
         if(type < PSBObjType::ResourceN1 || type > PSBObjType::ResourceN4) {
             return false;
         }
-        const int indexBytes =
-            static_cast<int>(type) -
+        const int indexBytes = static_cast<int>(type) -
             static_cast<int>(PSBObjType::ResourceN1) + 1;
         PSBResource res(indexBytes, stream);
         if(!res.index.has_value()) {

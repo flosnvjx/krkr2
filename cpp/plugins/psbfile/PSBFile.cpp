@@ -341,13 +341,15 @@ namespace PSB {
                _header.GetHeaderLength() > stream->GetSize()) {
                 emote_decrypt(
                     &emoteCtx,
-                    reinterpret_cast<std::uint8_t *>(&_header.offsetEncrypt), 4);
+                    reinterpret_cast<std::uint8_t *>(&_header.offsetEncrypt),
+                    4);
                 emote_decrypt(
                     &emoteCtx,
                     reinterpret_cast<std::uint8_t *>(&_header.offsetNames), 4);
                 emote_decrypt(
                     &emoteCtx,
-                    reinterpret_cast<std::uint8_t *>(&_header.offsetStrings), 4);
+                    reinterpret_cast<std::uint8_t *>(&_header.offsetStrings),
+                    4);
                 emote_decrypt(&emoteCtx,
                               reinterpret_cast<std::uint8_t *>(
                                   &_header.offsetStringsData),
@@ -397,7 +399,8 @@ namespace PSB {
                     emote_decrypt(
                         &emoteCtx,
                         &static_cast<std::uint8_t *>(
-                            memStream->GetInternalBuffer())[_header.offsetEncrypt],
+                            memStream
+                                ->GetInternalBuffer())[_header.offsetEncrypt],
                         _header.offsetChunkOffsets - _header.offsetEncrypt);
                 }
             }
@@ -407,10 +410,11 @@ namespace PSB {
             auto decrypted = std::make_unique<tTVPMemoryStream>(
                 nullptr, static_cast<tjs_uint>(stream->GetSize()));
             stream->SetPosition(0);
-            stream->ReadBuffer(decrypted->GetInternalBuffer(), stream->GetSize());
-            auto *cba = new CBinaryAccessor(
-                reinterpret_cast<unsigned char *>(decrypted->GetInternalBuffer()),
-                decrypted->GetSize());
+            stream->ReadBuffer(decrypted->GetInternalBuffer(),
+                               stream->GetSize());
+            auto *cba = new CBinaryAccessor(reinterpret_cast<unsigned char *>(
+                                                decrypted->GetInternalBuffer()),
+                                            decrypted->GetSize());
             tTJSVariant buff(cba);
             cba->Release();
             tTJSVariant bufferLen(static_cast<tjs_int>(decrypted->GetSize()));

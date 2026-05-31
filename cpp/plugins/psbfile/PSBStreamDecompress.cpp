@@ -10,27 +10,28 @@
 #include "PSBLz4Stream.h"
 
 namespace PSB {
-namespace {
+    namespace {
 
-    std::unique_ptr<tTVPMemoryStream>
-    decompressMdfStream(TJS::tTJSBinaryStream *orgStream, size_t readSize) {
-        uLongf uncompressedSize = orgStream->ReadI32LE();
-        std::vector<tjs_uint8> uncompressed(uncompressedSize);
-        std::vector<tjs_uint8> compressed(readSize - 8);
-        orgStream->Read(compressed.data(), readSize - 8);
-        if(uncompress(uncompressed.data(), &uncompressedSize, compressed.data(),
-                      static_cast<uLong>(readSize - 8)) != Z_OK) {
-            return nullptr;
+        std::unique_ptr<tTVPMemoryStream>
+        decompressMdfStream(TJS::tTJSBinaryStream *orgStream, size_t readSize) {
+            uLongf uncompressedSize = orgStream->ReadI32LE();
+            std::vector<tjs_uint8> uncompressed(uncompressedSize);
+            std::vector<tjs_uint8> compressed(readSize - 8);
+            orgStream->Read(compressed.data(), readSize - 8);
+            if(uncompress(uncompressed.data(), &uncompressedSize,
+                          compressed.data(),
+                          static_cast<uLong>(readSize - 8)) != Z_OK) {
+                return nullptr;
+            }
+            auto stream = std::make_unique<tTVPMemoryStream>(
+                nullptr, static_cast<tjs_uint>(uncompressedSize));
+            std::memcpy(stream->GetInternalBuffer(), uncompressed.data(),
+                        uncompressedSize);
+            stream->SetPosition(0);
+            return stream;
         }
-        auto stream = std::make_unique<tTVPMemoryStream>(
-            nullptr, static_cast<tjs_uint>(uncompressedSize));
-        std::memcpy(stream->GetInternalBuffer(), uncompressed.data(),
-                    uncompressedSize);
-        stream->SetPosition(0);
-        return stream;
-    }
 
-} // namespace
+    } // namespace
 
     std::unique_ptr<tTVPMemoryStream>
     openDecompressedStream(TJS::tTJSBinaryStream *input) {
@@ -54,8 +55,8 @@ namespace {
             return decompressMdfStream(input, readSize);
         }
 
-        auto stream =
-            std::make_unique<tTVPMemoryStream>(nullptr, static_cast<tjs_uint>(readSize));
+        auto stream = std::make_unique<tTVPMemoryStream>(
+            nullptr, static_cast<tjs_uint>(readSize));
         input->SetPosition(0);
         input->ReadBuffer(stream->GetInternalBuffer(), readSize);
         stream->SetPosition(0);

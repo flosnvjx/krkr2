@@ -14,28 +14,23 @@
 #define strncasecmp _strnicmp
 #endif
 
-#define GLM_ASSERT_VALID(matrix) \
-    do \
-    { \
-        const glm::mat4& m = (matrix); \
-        for (int i = 0; i < 4; ++i) \
-        { \
-            for (int j = 0; j < 4; ++j) \
-            { \
-                assert(!std::isnan(m[i][j]) && "矩阵包含NaN值"); \
-                assert(!std::isinf(m[i][j]) && "矩阵包含无穷大值"); \
-            } \
-        } \
-    } while (0)
+#define GLM_ASSERT_VALID(matrix)                                               \
+    do {                                                                       \
+        const glm::mat4 &m = (matrix);                                         \
+        for(int i = 0; i < 4; ++i) {                                           \
+            for(int j = 0; j < 4; ++j) {                                       \
+                assert(!std::isnan(m[i][j]) && "矩阵包含NaN值");               \
+                assert(!std::isinf(m[i][j]) && "矩阵包含无穷大值");            \
+            }                                                                  \
+        }                                                                      \
+    } while(0)
 
 using namespace PSB;
 
-namespace emoteplayer
-{
+namespace emoteplayer {
 #pragma region Physics
 
-    class EasingForce
-    {
+    class EasingForce {
     public:
         std::string name;
         Vector3 targetForce;
@@ -46,23 +41,17 @@ namespace emoteplayer
         float easing;
         bool isActive;
 
-        EasingForce() : duration(0), elapsedTime(0), easing(0), isActive(false) {}
+        EasingForce() :
+            duration(0), elapsedTime(0), easing(0), isActive(false) {}
 
-        EasingForce(const std::string& n, const Vector3& target, float t, float e)
-          : name(n),
-            targetForce(target),
-            startForce(Vector3::zero()),
-            currentForce(Vector3::zero()),
-            duration(t),
-            elapsedTime(0),
-            easing(e),
-            isActive(true)
-        {
-        }
+        EasingForce(const std::string &n, const Vector3 &target, float t,
+                    float e) :
+            name(n), targetForce(target), startForce(Vector3::zero()),
+            currentForce(Vector3::zero()), duration(t), elapsedTime(0),
+            easing(e), isActive(true) {}
 
-        void update(float deltaTime)
-        {
-            if (!isActive)
+        void update(float deltaTime) {
+            if(!isActive)
                 return;
 
             elapsedTime += deltaTime;
@@ -71,8 +60,7 @@ namespace emoteplayer
             float t = applyEasing(progress, easing);
             currentForce = startForce + (targetForce - startForce) * t;
 
-            if (progress >= 1.0f)
-            {
+            if(progress >= 1.0f) {
                 isActive = false;
             }
         }
@@ -80,84 +68,66 @@ namespace emoteplayer
         bool shouldRemove() const { return !isActive; }
 
     private:
-        float applyEasing(float t, float easing)
-        {
-            if (easing < 0)
-            {
+        float applyEasing(float t, float easing) {
+            if(easing < 0) {
                 return 1.0f - std::cos((t * 3.14159265f) / 2.0f);
-            }
-            else if (easing > 0)
-            {
+            } else if(easing > 0) {
                 return std::sin((t * 3.14159265f) / 2.0f);
-            }
-            else
-            {
+            } else {
                 return t;
             }
         }
     };
-    class OuterForceSystem
-    {
+    class OuterForceSystem {
     private:
         std::unordered_map<std::string, EasingForce> activeForces;
 
     public:
-        void setOuterForce(
-            const std::string& name, float ofx, float ofy, float time = 0, float easing = 0)
-        {
+        void setOuterForce(const std::string &name, float ofx, float ofy,
+                           float time = 0, float easing = 0) {
             Vector3 targetForce(ofx, ofy, 0);
 
-            if (time <= 0)
-            {
+            if(time <= 0) {
                 EasingForce force(name, targetForce, 0, 0);
                 force.currentForce = targetForce;
                 force.isActive = false;
                 activeForces[name] = force;
-            }
-            else
-            {
+            } else {
                 EasingForce force(name, targetForce, time / 1000.0f, easing);
                 activeForces[name] = force;
             }
         }
 
-        void removeOuterForce(const std::string& name) { activeForces.erase(name); }
+        void removeOuterForce(const std::string &name) {
+            activeForces.erase(name);
+        }
 
         void clearAllForces() { activeForces.clear(); }
 
-        void update(float deltaTime)
-        {
-            for (auto it = activeForces.begin(); it != activeForces.end();)
-            {
+        void update(float deltaTime) {
+            for(auto it = activeForces.begin(); it != activeForces.end();) {
                 it->second.update(deltaTime);
-                if (it->second.shouldRemove())
-                {
+                if(it->second.shouldRemove()) {
                     it = activeForces.erase(it);
-                }
-                else
-                {
+                } else {
                     ++it;
                 }
             }
         }
 
-        Vector3 getTotalOuterForce()
-        {
+        Vector3 getTotalOuterForce() {
             Vector3 totalForce = Vector3::zero();
-            for (auto& pair : activeForces)
-            {
+            for(auto &pair : activeForces) {
                 totalForce = totalForce + pair.second.currentForce;
             }
             return totalForce;
         }
 
-        bool hasForce(const std::string& name) const
-        {
+        bool hasForce(const std::string &name) const {
             return activeForces.find(name) != activeForces.end();
         }
     };
-    class WindSystem
-    {
+    class WindSystem {
     private:
         Vector3 windStart;
         Vector3 windGoal;
@@ -170,19 +140,12 @@ namespace emoteplayer
         float timeAccumulator;
 
     public:
-        WindSystem()
-          : windSpeed(0),
-            windPowerMin(0),
-            windPowerMax(0),
-            currentWindPower(0),
-            isWindActive(false),
-            timeAccumulator(0)
-        {
-        }
+        WindSystem() :
+            windSpeed(0), windPowerMin(0), windPowerMax(0), currentWindPower(0),
+            isWindActive(false), timeAccumulator(0) {}
 
-        void startWind(
-            const Vector3& start, const Vector3& goal, float speed, float powMin, float powMax)
-        {
+        void startWind(const Vector3 &start, const Vector3 &goal, float speed,
+                       float powMin, float powMax) {
             windStart = start;
             windGoal = goal;
             windSpeed = speed;
@@ -194,51 +157,48 @@ namespace emoteplayer
             timeAccumulator = 0;
         }
 
-        void stopWind()
-        {
+        void stopWind() {
             isWindActive = false;
             currentWindPower = 0.0f;
         }
 
-        void update(float deltaTime)
-        {
-            if (!isWindActive)
+        void update(float deltaTime) {
+            if(!isWindActive)
                 return;
 
             timeAccumulator += deltaTime;
-            currentWindPower =
-                windPowerMin + (windPowerMax - windPowerMin) *
-                                   (0.5f + 0.5f * std::sin(timeAccumulator * windSpeed));
+            currentWindPower = windPowerMin +
+                (windPowerMax - windPowerMin) *
+                    (0.5f + 0.5f * std::sin(timeAccumulator * windSpeed));
         }
 
-        Vector3 getWindForceAtPosition(const Vector3& position)
-        {
-            if (!isWindActive)
+        Vector3 getWindForceAtPosition(const Vector3 &position) {
+            if(!isWindActive)
                 return Vector3::zero();
 
             float distanceFactor = calculateDistanceFactor(position);
             float powerVariation = 0.8f + 0.2f * noise(position.x, position.z);
 
-            return windDirection * currentWindPower * distanceFactor * powerVariation;
+            return windDirection * currentWindPower * distanceFactor *
+                powerVariation;
         }
 
         bool isActive() const { return isWindActive; }
 
     private:
-        float calculateDistanceFactor(const Vector3& position)
-        {
-            Vector3 closestPoint = findClosestPointOnLine(position, windStart, windGoal);
+        float calculateDistanceFactor(const Vector3 &position) {
+            Vector3 closestPoint =
+                findClosestPointOnLine(position, windStart, windGoal);
             float distance = (position - closestPoint).magnitude();
             return std::max(0.0f, 1.0f - distance / 50.0f);
         }
 
-        Vector3 findClosestPointOnLine(const Vector3& point,
-                                       const Vector3& lineStart,
-                                       const Vector3& lineEnd)
-        {
+        Vector3 findClosestPointOnLine(const Vector3 &point,
+                                       const Vector3 &lineStart,
+                                       const Vector3 &lineEnd) {
             Vector3 lineVec = lineEnd - lineStart;
             float lineLength = lineVec.magnitude();
-            if (lineLength == 0)
+            if(lineLength == 0)
                 return lineStart;
 
             Vector3 lineDir = lineVec / lineLength;
@@ -248,54 +208,39 @@ namespace emoteplayer
             return lineStart + lineDir * projection;
         }
 
-        float noise(float x, float z) { return (std::sin(x * 0.1f) + std::sin(z * 0.15f)) * 0.5f; }
+        float noise(float x, float z) {
+            return (std::sin(x * 0.1f) + std::sin(z * 0.15f)) * 0.5f;
+        }
     };
-    class BustPhysicsSimulator
-    {
+    class BustPhysicsSimulator {
     private:
-        struct BustState
-        {
+        struct BustState {
             Vector3 restPosition; // 静止位置 (op)
-            Vector3 position;     // 当前位置 (p)
-            Vector3 velocity;     // 当前速度 (pv)
-            float offset;         // 偏移量 (ofs)
+            Vector3 position; // 当前位置 (p)
+            Vector3 velocity; // 当前速度 (pv)
+            float offset; // 偏移量 (ofs)
         };
 
         BustState state;
-        float spring;       // 弹簧系数
-        float friction;     // 摩擦力
-        float gravity;      // 重力
-        float scale_x;      // X轴缩放
-        float scale_y;      // Y轴缩放
+        float spring; // 弹簧系数
+        float friction; // 摩擦力
+        float gravity; // 重力
+        float scale_x; // X轴缩放
+        float scale_y; // Y轴缩放
         std::string var_lr; // 左右变量名
         std::string var_ud; // 上下变量名
         bool enabled;
 
     public:
-        BustPhysicsSimulator()
-          : spring(0),
-            friction(0),
-            gravity(0),
-            scale_x(1),
-            scale_y(1),
-            enabled(false)
-        {
-        }
+        BustPhysicsSimulator() :
+            spring(0), friction(0), gravity(0), scale_x(1), scale_y(1),
+            enabled(false) {}
 
-        void initialize(const std::string& baseLayer,
-                        bool enable,
-                        float fric,
-                        float grav,
-                        const Vector3& op,
-                        const Vector3& p,
-                        const Vector3& pv,
-                        float ofs,
-                        float spr,
-                        float scl_x,
-                        float scl_y,
-                        const std::string& lr,
-                        const std::string& ud)
-        {
+        void initialize(const std::string &baseLayer, bool enable, float fric,
+                        float grav, const Vector3 &op, const Vector3 &p,
+                        const Vector3 &pv, float ofs, float spr, float scl_x,
+                        float scl_y, const std::string &lr,
+                        const std::string &ud) {
             state.restPosition = op;
             state.position = p;
             state.velocity = pv;
@@ -310,13 +255,13 @@ namespace emoteplayer
             enabled = enable;
         }
 
-        void update(float deltaTime, const Vector3& externalForce)
-        {
-            if (!enabled)
+        void update(float deltaTime, const Vector3 &externalForce) {
+            if(!enabled)
                 return;
 
             // 弹簧力 (胡克定律)
-            Vector3 springForce = (state.restPosition - state.position) * spring;
+            Vector3 springForce =
+                (state.restPosition - state.position) * spring;
 
             // 重力
             Vector3 gravityForce = Vector3(0, -gravity, 0);
@@ -325,7 +270,8 @@ namespace emoteplayer
             Vector3 frictionForce = state.velocity * -friction;
 
             // 合力
-            Vector3 totalForce = springForce + gravityForce + frictionForce + externalForce;
+            Vector3 totalForce =
+                springForce + gravityForce + frictionForce + externalForce;
 
             // 更新物理状态
             state.velocity = state.velocity + totalForce * deltaTime;
@@ -335,11 +281,10 @@ namespace emoteplayer
             updateOutputVariables();
         }
 
-        float getVariableValue(const std::string& varName) { return 0.0f; }
+        float getVariableValue(const std::string &varName) { return 0.0f; }
 
     private:
-        void updateOutputVariables()
-        {
+        void updateOutputVariables() {
             // 计算相对于静止位置的偏移
             Vector3 offsetFromRest = state.position - state.restPosition;
 
@@ -352,10 +297,9 @@ namespace emoteplayer
             setVariableValue(var_ud, bust_UD);
         }
 
-        void setVariableValue(const std::string& varName, float value) {}
+        void setVariableValue(const std::string &varName, float value) {}
     };
-    class HairSegment
-    {
+    class HairSegment {
     public:
         Vector3 basePosition;
         Vector3 position;
@@ -366,8 +310,7 @@ namespace emoteplayer
 
         HairSegment() : scaleX(1), scaleY(1), length(0) {}
     };
-    class HairPhysicsSimulator
-    {
+    class HairPhysicsSimulator {
     private:
         std::vector<HairSegment> segments;
 
@@ -385,31 +328,15 @@ namespace emoteplayer
         std::string var_ud;
 
     public:
-        HairPhysicsSimulator()
-          : b_rate(0),
-            gravity(0),
-            friction_x(0),
-            friction_y(0),
-            bend_spd(0),
-            bend_vol(0),
-            offset(0),
-            v_bound(false)
-        {
-        }
+        HairPhysicsSimulator() :
+            b_rate(0), gravity(0), friction_x(0), friction_y(0), bend_spd(0),
+            bend_vol(0), offset(0), v_bound(false) {}
 
-        void initialize(const std::vector<HairSegment>& segs,
-                        float bRate,
-                        float grav,
-                        float fricX,
-                        float fricY,
-                        float bendSpd,
-                        float bendVol,
-                        float ofs,
-                        bool vBound,
-                        const std::string& lr,
-                        const std::string& lrm,
-                        const std::string& ud)
-        {
+        void initialize(const std::vector<HairSegment> &segs, float bRate,
+                        float grav, float fricX, float fricY, float bendSpd,
+                        float bendVol, float ofs, bool vBound,
+                        const std::string &lr, const std::string &lrm,
+                        const std::string &ud) {
             segments = segs;
             b_rate = bRate;
             gravity = grav;
@@ -424,85 +351,82 @@ namespace emoteplayer
             var_ud = ud;
         }
 
-        void update(float deltaTime, const Vector3& externalForce)
-        {
-            for (size_t i = 0; i < segments.size(); ++i)
-            {
+        void update(float deltaTime, const Vector3 &externalForce) {
+            for(size_t i = 0; i < segments.size(); ++i) {
                 updateSegment(segments[i], deltaTime, externalForce, i);
             }
             updateOutputVariables();
         }
 
-        float getVariableValue(const std::string& varName) { return 0.0f; }
+        float getVariableValue(const std::string &varName) { return 0.0f; }
 
     private:
-        void updateSegment(HairSegment& segment,
-                           float deltaTime,
-                           const Vector3& externalForce,
-                           int segmentIndex)
-        {
-            Vector3 springForce = (segment.basePosition - segment.position) * b_rate;
+        void updateSegment(HairSegment &segment, float deltaTime,
+                           const Vector3 &externalForce, int segmentIndex) {
+            Vector3 springForce =
+                (segment.basePosition - segment.position) * b_rate;
             Vector3 gravityForce = Vector3(0, -gravity, 0);
 
-            float windInfluence = 0.5f + 0.5f * (segmentIndex / (float)(segments.size() - 1));
-            Vector3 externalForceWithWind = externalForce * (1.0f + windInfluence);
+            float windInfluence =
+                0.5f + 0.5f * (segmentIndex / (float)(segments.size() - 1));
+            Vector3 externalForceWithWind =
+                externalForce * (1.0f + windInfluence);
 
             Vector3 frictionForce;
             frictionForce.x = -segment.velocity.x * friction_x;
             frictionForce.y = -segment.velocity.y * friction_y;
-            frictionForce.z = -segment.velocity.z * std::min(friction_x, friction_y);
+            frictionForce.z =
+                -segment.velocity.z * std::min(friction_x, friction_y);
 
             Vector3 bendForce = calculateBendForce(segment, segmentIndex);
 
-            Vector3 totalForce =
-                springForce + gravityForce + externalForceWithWind + frictionForce + bendForce;
+            Vector3 totalForce = springForce + gravityForce +
+                externalForceWithWind + frictionForce + bendForce;
 
             segment.velocity = segment.velocity + totalForce * deltaTime;
 
-            if (v_bound)
-            {
+            if(v_bound) {
                 segment.velocity = clampVelocity(segment.velocity);
             }
 
             segment.position = segment.position + segment.velocity * deltaTime;
         }
 
-        Vector3 calculateBendForce(const HairSegment& segment, int segmentIndex)
-        {
+        Vector3 calculateBendForce(const HairSegment &segment,
+                                   int segmentIndex) {
             Vector3 force = Vector3::zero();
 
-            if (segmentIndex > 0)
-            {
-                const HairSegment& prevSegment = segments[segmentIndex - 1];
-                Vector3 dir = (segment.position - prevSegment.position).normalized();
+            if(segmentIndex > 0) {
+                const HairSegment &prevSegment = segments[segmentIndex - 1];
+                Vector3 dir =
+                    (segment.position - prevSegment.position).normalized();
                 force = dir * bend_vol * bend_spd;
             }
 
             return force;
         }
 
-        Vector3 clampVelocity(const Vector3& velocity)
-        {
+        Vector3 clampVelocity(const Vector3 &velocity) {
             float maxSpeed = 10.0f;
             float currentSpeed = velocity.magnitude();
 
-            if (currentSpeed > maxSpeed && currentSpeed > 0)
-            {
+            if(currentSpeed > maxSpeed && currentSpeed > 0) {
                 return velocity * (maxSpeed / currentSpeed);
             }
             return velocity;
         }
 
-        void updateOutputVariables()
-        {
-            if (segments.size() < 2)
+        void updateOutputVariables() {
+            if(segments.size() < 2)
                 return;
 
-            Vector3 segment1Offset = segments[0].position - segments[0].basePosition;
+            Vector3 segment1Offset =
+                segments[0].position - segments[0].basePosition;
             float lr1 = segment1Offset.x * segments[0].scaleX;
             float ud1 = segment1Offset.y * segments[0].scaleY;
 
-            Vector3 segment2Offset = segments[1].position - segments[1].basePosition;
+            Vector3 segment2Offset =
+                segments[1].position - segments[1].basePosition;
             float lr2 = segment2Offset.x * segments[1].scaleX;
             float ud2 = segment2Offset.y * segments[1].scaleY;
 
@@ -515,10 +439,9 @@ namespace emoteplayer
             setVariableValue(var_ud, hair_UD);
         }
 
-        void setVariableValue(const std::string& varName, float value) {}
+        void setVariableValue(const std::string &varName, float value) {}
     };
-    class CompletePhysicsSystem
-    {
+    class CompletePhysicsSystem {
     private:
         HairPhysicsSimulator hairPhysics;
         BustPhysicsSimulator bustPhysics;
@@ -526,11 +449,8 @@ namespace emoteplayer
         OuterForceSystem outerForceSystem;
 
     public:
-        void update(float deltaTime,
-                    const Vector3& headMovement,
-                    const Vector3& headPosition,
-                    const Vector3& bodyMovement)
-        {
+        void update(float deltaTime, const Vector3 &headMovement,
+                    const Vector3 &headPosition, const Vector3 &bodyMovement) {
             // 更新外力系统
             outerForceSystem.update(deltaTime);
 
@@ -539,13 +459,15 @@ namespace emoteplayer
             Vector3 outerForce = outerForceSystem.getTotalOuterForce();
 
             // 合并所有外力
-            Vector3 totalExternalForce = calculateTotalForce(headMovement, windForce, outerForce);
+            Vector3 totalExternalForce =
+                calculateTotalForce(headMovement, windForce, outerForce);
 
             // 更新头发物理（使用头部运动）
             hairPhysics.update(deltaTime, totalExternalForce);
 
             // 更新胸部物理（使用身体运动）
-            Vector3 bustExternalForce = calculateBustForce(bodyMovement, windForce, outerForce);
+            Vector3 bustExternalForce =
+                calculateBustForce(bodyMovement, windForce, outerForce);
             bustPhysics.update(deltaTime, bustExternalForce);
 
             // 更新风系统
@@ -553,69 +475,54 @@ namespace emoteplayer
         }
 
         // 风系统控制
-        void startWind(
-            const Vector3& start, const Vector3& goal, float speed, float powMin, float powMax)
-        {
+        void startWind(const Vector3 &start, const Vector3 &goal, float speed,
+                       float powMin, float powMax) {
             windSystem.startWind(start, goal, speed, powMin, powMax);
         }
 
         void stopWind() { windSystem.stopWind(); }
 
         // 外力系统控制
-        void setOuterForce(
-            const std::string& name, float ofx, float ofy, float time = 0, float easing = 0)
-        {
+        void setOuterForce(const std::string &name, float ofx, float ofy,
+                           float time = 0, float easing = 0) {
             outerForceSystem.setOuterForce(name, ofx, ofy, time, easing);
         }
 
-        void removeOuterForce(const std::string& name) { outerForceSystem.removeOuterForce(name); }
+        void removeOuterForce(const std::string &name) {
+            outerForceSystem.removeOuterForce(name);
+        }
 
         void clearAllOuterForces() { outerForceSystem.clearAllForces(); }
 
         // 头发系统初始化
-        void initializeHairPhysics(const std::vector<HairSegment>& segs,
-                                   float bRate,
-                                   float grav,
-                                   float fricX,
-                                   float fricY,
-                                   float bendSpd,
-                                   float bendVol,
-                                   float ofs,
-                                   bool vBound,
-                                   const std::string& lr,
-                                   const std::string& lrm,
-                                   const std::string& ud)
-        {
-            hairPhysics.initialize(segs, bRate, grav, fricX, fricY, bendSpd, bendVol, ofs, vBound,
-                                   lr, lrm, ud);
+        void initializeHairPhysics(const std::vector<HairSegment> &segs,
+                                   float bRate, float grav, float fricX,
+                                   float fricY, float bendSpd, float bendVol,
+                                   float ofs, bool vBound,
+                                   const std::string &lr,
+                                   const std::string &lrm,
+                                   const std::string &ud) {
+            hairPhysics.initialize(segs, bRate, grav, fricX, fricY, bendSpd,
+                                   bendVol, ofs, vBound, lr, lrm, ud);
         }
 
         // 胸部系统初始化
-        void initializeBustPhysics(const std::string& baseLayer,
-                                   bool enable,
-                                   float fric,
-                                   float grav,
-                                   const Vector3& op,
-                                   const Vector3& p,
-                                   const Vector3& pv,
-                                   float ofs,
-                                   float spr,
-                                   float scl_x,
-                                   float scl_y,
-                                   const std::string& lr,
-                                   const std::string& ud)
-        {
-            bustPhysics.initialize(baseLayer, enable, fric, grav, op, p, pv, ofs, spr, scl_x, scl_y,
-                                   lr, ud);
+        void initializeBustPhysics(const std::string &baseLayer, bool enable,
+                                   float fric, float grav, const Vector3 &op,
+                                   const Vector3 &p, const Vector3 &pv,
+                                   float ofs, float spr, float scl_x,
+                                   float scl_y, const std::string &lr,
+                                   const std::string &ud) {
+            bustPhysics.initialize(baseLayer, enable, fric, grav, op, p, pv,
+                                   ofs, spr, scl_x, scl_y, lr, ud);
         }
 
         bool isWindActive() const { return windSystem.isActive(); }
 
     private:
-        Vector3 calculateTotalForce(const Vector3& headMovement,
-                                    const Vector3& windForce,
-                                    const Vector3& outerForce)
-        {
+        Vector3 calculateTotalForce(const Vector3 &headMovement,
+                                    const Vector3 &windForce,
+                                    const Vector3 &outerForce) {
             Vector3 totalForce;
 
             // 头部运动的影响（对头发）
@@ -629,10 +536,9 @@ namespace emoteplayer
             return totalForce;
         }
 
-        Vector3 calculateBustForce(const Vector3& bodyMovement,
-                                   const Vector3& windForce,
-                                   const Vector3& outerForce)
-        {
+        Vector3 calculateBustForce(const Vector3 &bodyMovement,
+                                   const Vector3 &windForce,
+                                   const Vector3 &outerForce) {
             Vector3 totalForce;
 
             // 身体运动的影响（对胸部）
@@ -646,14 +552,12 @@ namespace emoteplayer
             return totalForce;
         }
     };
-    class ExampleUsage
-    {
+    class ExampleUsage {
     private:
         CompletePhysicsSystem physicsSystem;
 
     public:
-        void initialize()
-        {
+        void initialize() {
             // 初始化头发系统
             std::vector<HairSegment> hairSegments(2);
 
@@ -672,52 +576,54 @@ namespace emoteplayer
             hairSegments[1].length = 48.0f;
 
             physicsSystem.initializeHairPhysics(
-                hairSegments, 0.00371093745f, 0.6f, 0.046875f, 0.09375f, 0.2f, 3.0f, -161.684357f,
-                true, "hair_LR_front", "hair_LR_M_front", "hair_UD_front");
+                hairSegments, 0.00371093745f, 0.6f, 0.046875f, 0.09375f, 0.2f,
+                3.0f, -161.684357f, true, "hair_LR_front", "hair_LR_M_front",
+                "hair_UD_front");
 
             // 初始化胸部系统
-            physicsSystem.initializeBustPhysics("center_bust",               // baseLayer
-                                                true,                        // enabled
-                                                0.06f,                       // friction
-                                                0.1f,                        // gravity
-                                                Vector3(0, 0, 0),            // op
-                                                Vector3(0, 3.200208, 0),     // p
-                                                Vector3(0, 9.272695E-06, 0), // pv
-                                                3.1996305f,                  // ofs
-                                                0.03125f,                    // spring
-                                                1.0f,                        // scale_x
-                                                2.0f,                        // scale_y
-                                                "bust_LR",                   // var_lr
-                                                "bust_UD"                    // var_ud
+            physicsSystem.initializeBustPhysics(
+                "center_bust", // baseLayer
+                true, // enabled
+                0.06f, // friction
+                0.1f, // gravity
+                Vector3(0, 0, 0), // op
+                Vector3(0, 3.200208, 0), // p
+                Vector3(0, 9.272695E-06, 0), // pv
+                3.1996305f, // ofs
+                0.03125f, // spring
+                1.0f, // scale_x
+                2.0f, // scale_y
+                "bust_LR", // var_lr
+                "bust_UD" // var_ud
             );
         }
 
-        void update(float deltaTime,
-                    const Vector3& headPosition,
-                    const Vector3& headMovement,
-                    const Vector3& bodyMovement)
-        {
-            physicsSystem.update(deltaTime, headMovement, headPosition, bodyMovement);
+        void update(float deltaTime, const Vector3 &headPosition,
+                    const Vector3 &headMovement, const Vector3 &bodyMovement) {
+            physicsSystem.update(deltaTime, headMovement, headPosition,
+                                 bodyMovement);
         }
 
-        void triggerWind()
-        {
-            physicsSystem.startWind(Vector3(-100, 50, 0), Vector3(100, 50, 0), 2.0f, 0.5f, 3.0f);
+        void triggerWind() {
+            physicsSystem.startWind(Vector3(-100, 50, 0), Vector3(100, 50, 0),
+                                    2.0f, 0.5f, 3.0f);
         }
 
-        void applyQuickShake() { physicsSystem.setOuterForce("shake", 5.0f, 2.0f, 200, 1.0f); }
+        void applyQuickShake() {
+            physicsSystem.setOuterForce("shake", 5.0f, 2.0f, 200, 1.0f);
+        }
 
-        void applyGentleSway() { physicsSystem.setOuterForce("sway", -3.0f, 1.0f, 1000, -1.0f); }
+        void applyGentleSway() {
+            physicsSystem.setOuterForce("sway", -3.0f, 1.0f, 1000, -1.0f);
+        }
 
-        void stopAllForces()
-        {
+        void stopAllForces() {
             physicsSystem.stopWind();
             physicsSystem.clearAllOuterForces();
         }
     };
 
-    bustControl::bustControl(emotefile* filePtr, uint32_t startOffset)
-    {
+    bustControl::bustControl(emotefile *filePtr, uint32_t startOffset) {
         // dic
         std::map<std::string, uint32_t> _rootData;
         filePtr->parseObject(_rootData, startOffset);
@@ -725,47 +631,39 @@ namespace emoteplayer
         filePtr->parseReal(friction, _rootData["friction"]);
         filePtr->parseReal(gravity, _rootData["gravity"]);
         filePtr->parseReal(spring, _rootData["spring"]);
-        //scale_x/y
+        // scale_x/y
         filePtr->parseReal(scale_x, _rootData["scale_x"]);
         filePtr->parseReal(scale_y, _rootData["scale_y"]);
-        //lable
+        // lable
         filePtr->parseString(var_lr, _rootData["var_lr"]);
         filePtr->parseString(var_ud, _rootData["var_ud"]);
-        //param
-        if (filePtr->parseObject(_rootData, _rootData["param"]))
-        {
+        // param
+        if(filePtr->parseObject(_rootData, _rootData["param"])) {
             filePtr->parseReal(param.ofs, _rootData["ofs"]);
             // op
             std::map<std::string, uint32_t> _tmpData;
-            if (filePtr->parseObject(_tmpData, _rootData["op"]))
-            {
+            if(filePtr->parseObject(_tmpData, _rootData["op"])) {
                 filePtr->parseReal(param.op.x, _tmpData["x"]);
                 filePtr->parseReal(param.op.y, _tmpData["y"]);
                 filePtr->parseReal(param.op.z, _tmpData["z"]);
             }
             // p
-            if (filePtr->parseObject(_tmpData, _rootData["p"]))
-            {
+            if(filePtr->parseObject(_tmpData, _rootData["p"])) {
                 filePtr->parseReal(param.p.x, _tmpData["x"]);
                 filePtr->parseReal(param.p.y, _tmpData["y"]);
                 filePtr->parseReal(param.p.z, _tmpData["z"]);
             }
             // pv
-            if (filePtr->parseObject(_tmpData, _rootData["pv"]))
-            {
+            if(filePtr->parseObject(_tmpData, _rootData["pv"])) {
                 filePtr->parseReal(param.pv.x, _tmpData["x"]);
                 filePtr->parseReal(param.pv.y, _tmpData["y"]);
                 filePtr->parseReal(param.pv.z, _tmpData["z"]);
             }
         }
     }
-    bustControl::~bustControl()
-    {
+    bustControl::~bustControl() {}
 
-    }
-
-    uniControl::uniControl(emotefile* filePtr, uint32_t startOffset)
-    {
+    uniControl::uniControl(emotefile *filePtr, uint32_t startOffset) {
         // dic
         std::map<std::string, uint32_t> _rootData;
         filePtr->parseObject(_rootData, startOffset);
@@ -788,15 +686,13 @@ namespace emoteplayer
         filePtr->parseList(_sx, _rootData["scale_x"]);
         filePtr->parseList(_sy, _rootData["scale_y"]);
         filePtr->parseList(_len, _rootData["length"]);
-        if (filePtr->parseObject(_rootData, _rootData["param"]))
-        {
+        if(filePtr->parseObject(_rootData, _rootData["param"])) {
             // ofs/bendR/bendS/op
             filePtr->parseReal(ofs, _rootData["ofs"]);
             filePtr->parseReal(bendR, _rootData["bendR"]);
             filePtr->parseReal(bendS, _rootData["bendS"]);
             std::map<std::string, uint32_t> _tmpData;
-            if (filePtr->parseObject(_tmpData, _rootData["op"]))
-            {
+            if(filePtr->parseObject(_tmpData, _rootData["op"])) {
                 filePtr->parseReal(op.x, _tmpData["x"]);
                 filePtr->parseReal(op.y, _tmpData["y"]);
                 filePtr->parseReal(op.z, _tmpData["z"]);
@@ -808,8 +704,7 @@ namespace emoteplayer
             filePtr->parseList(_pv, _rootData["pv"]);
             // bp/p/pv
             int cts = std::min(_bp.size(), std::min(_p.size(), _pv.size()));
-            for (int i = 0; i < cts; i++)
-            {
+            for(int i = 0; i < cts; i++) {
                 uniSegment _psD;
                 filePtr->parseObject(_tmpData, _bp.at(i));
                 filePtr->parseReal(_psD.bp.x, _tmpData["x"]);
@@ -830,18 +725,13 @@ namespace emoteplayer
             }
         }
     }
-    uniControl::~uniControl()
-    {
-
-    }
+    uniControl::~uniControl() {}
 
     // 物理玩不明白，这都是ai写的 分别用于parts/hair/bust
-    SmoothPeriodicRandom::SmoothPeriodicRandom()
-      : noise_seed(std::rand() / float(RAND_MAX) * 1000.0f)
-    {
-    }
-    float SmoothPeriodicRandom::generate(float tick, float a, float b, float period)
-    {
+    SmoothPeriodicRandom::SmoothPeriodicRandom() :
+        noise_seed(std::rand() / float(RAND_MAX) * 1000.0f) {}
+    float SmoothPeriodicRandom::generate(float tick, float a, float b,
+                                         float period) {
         // 基础周期
         float base = std::sin(tick * 2.0f * 3.14159f / period);
 
@@ -854,11 +744,10 @@ namespace emoteplayer
         // 优雅的映射
         return a + (b - a) * (0.5f + 0.4f * std::tanh(value));
     }
-    HairSwaySimulator::HairSwaySimulator()
-    {
+    HairSwaySimulator::HairSwaySimulator() {
         // 设置多个频率分量模拟不同发丝的飘动
-        frequencies = {0.8f, 1.2f, 1.7f, 2.3f, 0.5f};
-        amplitudes = {0.5f, 0.3f, 0.15f, 0.08f, 0.2f};
+        frequencies = { 0.8f, 1.2f, 1.7f, 2.3f, 0.5f };
+        amplitudes = { 0.5f, 0.3f, 0.15f, 0.08f, 0.2f };
 
         phases.resize(frequencies.size());
 
@@ -866,8 +755,7 @@ namespace emoteplayer
         std::mt19937 gen(rd());
         std::uniform_real_distribution<float> dist(0.0f, 6.28318f);
 
-        for (auto& phase : phases)
-        {
+        for(auto &phase : phases) {
             phase = dist(gen);
         }
 
@@ -876,9 +764,8 @@ namespace emoteplayer
         wind.progress = 0.0f;
     }
     // 风开始
-    void HairSwaySimulator::startWind(
-        glm::vec2 start, glm::vec2 goal, float speed, float powMin, float powMax)
-    {
+    void HairSwaySimulator::startWind(glm::vec2 start, glm::vec2 goal,
+                                      float speed, float powMin, float powMax) {
         wind.start = start;
         wind.goal = goal;
         wind.speed = speed;
@@ -894,15 +781,13 @@ namespace emoteplayer
         wind_seed = dist(gen);
     }
     // 停止风
-    void HairSwaySimulator::stopWind()
-    {
+    void HairSwaySimulator::stopWind() {
         wind.active = false;
         wind.progress = 0.0f;
     }
     // 获取当前风力强度（基于位置和进度）
-    float HairSwaySimulator::getCurrentWindStrength(glm::vec2 hairPosition)
-    {
-        if (!wind.active)
+    float HairSwaySimulator::getCurrentWindStrength(glm::vec2 hairPosition) {
+        if(!wind.active)
             return 0.0f;
 
         // 计算风路径的方向和距离
@@ -925,30 +810,28 @@ namespace emoteplayer
         float distanceToFront = std::abs(projection - windFront);
 
         // 风前沿的影响（高斯分布）
-        float frontFactor =
-            std::exp(-distanceToFront * distanceToFront / (windWidth * windWidth * 0.5f));
+        float frontFactor = std::exp(-distanceToFront * distanceToFront /
+                                     (windWidth * windWidth * 0.5f));
 
         // 组合所有因素
-        float strength = wind.powMin + (wind.powMax - wind.powMin) * wind.progress;
+        float strength =
+            wind.powMin + (wind.powMax - wind.powMin) * wind.progress;
         strength *= lateralFactor * frontFactor;
 
         return strength;
     }
     // 获取风的方向
-    glm::vec2 HairSwaySimulator::getWindDirection()
-    {
-        if (!wind.active)
+    glm::vec2 HairSwaySimulator::getWindDirection() {
+        if(!wind.active)
             return glm::vec2(1.0f, 0.0f); // 默认方向
         return glm::normalize(wind.goal - wind.start);
     }
-    float HairSwaySimulator::generate(float tick, glm::vec2 hairPosition, float a, float b)
-    {
+    float HairSwaySimulator::generate(float tick, glm::vec2 hairPosition,
+                                      float a, float b) {
         // 更新风进程
-        if (wind.active)
-        {
+        if(wind.active) {
             wind.progress += wind.speed * 0.01f; // 调整速度系数
-            if (wind.progress >= 1.0f)
-            {
+            if(wind.progress >= 1.0f) {
                 wind.active = false; // 风到达目标
             }
         }
@@ -956,9 +839,9 @@ namespace emoteplayer
         float result = 0.0f;
 
         // 1. 基础飘动（多个频率合成）
-        for (size_t i = 0; i < frequencies.size(); ++i)
-        {
-            float freq = frequencies[i] * (0.9f + 0.2f * std::sin(tick * 0.01f));
+        for(size_t i = 0; i < frequencies.size(); ++i) {
+            float freq =
+                frequencies[i] * (0.9f + 0.2f * std::sin(tick * 0.01f));
             result += amplitudes[i] * std::sin(tick * freq * 0.05f + phases[i]);
         }
 
@@ -966,16 +849,17 @@ namespace emoteplayer
         float wind_strength = getCurrentWindStrength(hairPosition);
         glm::vec2 wind_dir = getWindDirection();
 
-        if (wind_strength > 0.0f)
-        {
+        if(wind_strength > 0.0f) {
             // 主风浪
             float wind_wave = std::sin(tick * 0.3f + wind_seed) * wind_strength;
 
             // 风湍流（高频分量）
-            float wind_turbulence = std::sin(tick * 1.5f + wind_seed * 2.0f) * wind_strength * 0.3f;
+            float wind_turbulence =
+                std::sin(tick * 1.5f + wind_seed * 2.0f) * wind_strength * 0.3f;
 
             // 风向影响（主要影响水平分量）
-            float wind_direction_factor = std::abs(wind_dir.x); // 假设x是水平方向
+            float wind_direction_factor =
+                std::abs(wind_dir.x); // 假设x是水平方向
 
             result += (wind_wave + wind_turbulence) * wind_direction_factor;
         }
@@ -994,52 +878,36 @@ namespace emoteplayer
         return a + (b - a) * (0.5f + 0.4f * normalized);
     }
     // 检查风是否活跃
-    bool HairSwaySimulator::isWindActive()
-    {
-        return wind.active;
-    }
+    bool HairSwaySimulator::isWindActive() { return wind.active; }
     // 获取风进度
-    float HairSwaySimulator::getWindProgress()
-    {
-        return wind.progress;
-    }
-    BreastJiggleSimulator::SpringDamper::SpringDamper(float stiff,
-                                                      float damp,
-                                                      float m )
-      : position(0),
-        velocity(0),
-        target(0),
-        stiffness(stiff),
-        damping(damp),
-        mass(m)
-    {
-    }
-    void BreastJiggleSimulator::SpringDamper::update(float delta_time)
-    {
+    float HairSwaySimulator::getWindProgress() { return wind.progress; }
+    BreastJiggleSimulator::SpringDamper::SpringDamper(float stiff, float damp,
+                                                      float m) :
+        position(0), velocity(0), target(0), stiffness(stiff), damping(damp),
+        mass(m) {}
+    void BreastJiggleSimulator::SpringDamper::update(float delta_time) {
         // 弹簧阻尼器物理更新
-        float acceleration = (target - position) * stiffness - velocity * damping;
+        float acceleration =
+            (target - position) * stiffness - velocity * damping;
         acceleration /= mass;
         velocity += acceleration * delta_time;
         position += velocity * delta_time;
     }
-    BreastJiggleSimulator::SpringDamper vertical_spring;   // 垂直运动
+    BreastJiggleSimulator::SpringDamper vertical_spring; // 垂直运动
     BreastJiggleSimulator::SpringDamper horizontal_spring; // 水平运动
-    BreastJiggleSimulator::SpringDamper bounce_spring;     // 弹跳运动
-    float base_movement;                                   // 基础运动（如呼吸）
-    float last_body_movement;                              // 上一帧身体运动
-    BreastJiggleSimulator::BreastJiggleSimulator()
-      : vertical_spring(0.15f, 0.08f, 1.1f),   // 垂直：较软，较重
+    BreastJiggleSimulator::SpringDamper bounce_spring; // 弹跳运动
+    float base_movement; // 基础运动（如呼吸）
+    float last_body_movement; // 上一帧身体运动
+    BreastJiggleSimulator::BreastJiggleSimulator() :
+        vertical_spring(0.15f, 0.08f, 1.1f), // 垂直：较软，较重
         horizontal_spring(0.25f, 0.12f, 0.9f), // 水平：较硬，较轻
-        bounce_spring(0.3f, 0.2f, 0.8f),       // 弹跳：最硬，恢复快
-        base_movement(0),
-        last_body_movement(0)
-    {
-    }
-    float BreastJiggleSimulator::generate(
-        float tick, float body_movement, float a, float b, float delta_time)
-    {
+        bounce_spring(0.3f, 0.2f, 0.8f), // 弹跳：最硬，恢复快
+        base_movement(0), last_body_movement(0) {}
+    float BreastJiggleSimulator::generate(float tick, float body_movement,
+                                          float a, float b, float delta_time) {
         // 1. 基础生理运动（呼吸等）
-        base_movement = std::sin(tick * 0.3f) * 0.1f + std::sin(tick * 0.7f) * 0.05f;
+        base_movement =
+            std::sin(tick * 0.3f) * 0.1f + std::sin(tick * 0.7f) * 0.05f;
 
         // 2. 身体运动引起的驱动（走路、跑步等）
         float movement_delta = body_movement - last_body_movement;
@@ -1051,16 +919,14 @@ namespace emoteplayer
         vertical_spring.update(delta_time);
 
         // 水平运动（响应左右运动）
-        horizontal_spring.target = std::sin(tick * 0.5f) * 0.05f + movement_force * 0.3f;
+        horizontal_spring.target =
+            std::sin(tick * 0.5f) * 0.05f + movement_force * 0.3f;
         horizontal_spring.update(delta_time);
 
         // 弹跳运动（跳跃等冲击）
-        if (std::abs(movement_delta) > 0.5f)
-        {
+        if(std::abs(movement_delta) > 0.5f) {
             bounce_spring.target = movement_force * 1.5f;
-        }
-        else
-        {
+        } else {
             bounce_spring.target = 0;
         }
         bounce_spring.update(delta_time);
@@ -1071,7 +937,8 @@ namespace emoteplayer
         float bounce = bounce_spring.position * 0.4f;
 
         // 添加轻微随机扰动（模拟肌肉微颤）
-        float micro_tremor = std::sin(tick * 8.0f) * 0.02f * std::cos(tick * 3.0f);
+        float micro_tremor =
+            std::sin(tick * 8.0f) * 0.02f * std::cos(tick * 3.0f);
 
         float combined = vertical + horizontal + bounce + micro_tremor;
 
@@ -1082,8 +949,7 @@ namespace emoteplayer
         return a + (b - a) * (0.5f + softened);
     }
     // 外部冲击（如跳跃落地）
-    void BreastJiggleSimulator::addImpulse(float force)
-    {
+    void BreastJiggleSimulator::addImpulse(float force) {
         bounce_spring.velocity += force * 0.5f;
         vertical_spring.velocity += force * 0.3f;
     }

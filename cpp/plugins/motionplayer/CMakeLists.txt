@@ -7,7 +7,6 @@ target_sources(${PROJECT_NAME}
     PUBLIC
         main.cpp
     PRIVATE
-        EmoteGLBridge.cpp
         EmoteFileCore.cpp
         EmoteInternal.cpp
         EmoteFrame.cpp

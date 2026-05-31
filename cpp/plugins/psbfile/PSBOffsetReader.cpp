@@ -13,25 +13,25 @@
 #define LOGGER spdlog::get("plugin")
 
 namespace PSB {
-namespace {
+    namespace {
 
-    void parsePSBArray(std::vector<std::uint32_t> *target, int n,
-                       TJS::tTJSBinaryStream *stream) {
-        target->clear();
-        std::uint32_t count = 0;
-        stream->ReadBuffer(&count, n);
-        const auto entryLength = static_cast<std::uint8_t>(
-            stream->ReadI8LE() -
-            static_cast<std::int8_t>(PSBObjType::NumberN8));
-        target->reserve(count);
-        for(std::uint32_t i = 0; i < count; ++i) {
-            std::uint32_t val = 0;
-            stream->ReadBuffer(&val, entryLength);
-            target->push_back(val);
+        void parsePSBArray(std::vector<std::uint32_t> *target, int n,
+                           TJS::tTJSBinaryStream *stream) {
+            target->clear();
+            std::uint32_t count = 0;
+            stream->ReadBuffer(&count, n);
+            const auto entryLength = static_cast<std::uint8_t>(
+                stream->ReadI8LE() -
+                static_cast<std::int8_t>(PSBObjType::NumberN8));
+            target->reserve(count);
+            for(std::uint32_t i = 0; i < count; ++i) {
+                std::uint32_t val = 0;
+                stream->ReadBuffer(&val, entryLength);
+                target->push_back(val);
+            }
         }
-    }
 
-} // namespace
+    } // namespace
 
     std::uint32_t PSBFile::readListInfo(std::vector<std::uint32_t> *target) {
         parsePSBArray(target,
@@ -76,8 +76,8 @@ namespace {
             tmpOffset = readListInfo(&objsOffset);
         }
 
-        for(std::int32_t i = 0; i < static_cast<std::int32_t>(objsNamesIdx.size());
-            ++i) {
+        for(std::int32_t i = 0;
+            i < static_cast<std::int32_t>(objsNamesIdx.size()); ++i) {
             output.emplace(names.at(objsNamesIdx.at(i)),
                            tmpOffset + objsOffset.at(i));
         }
@@ -153,8 +153,9 @@ namespace {
             case PSBObjType::StringN4: {
                 std::int32_t idx = 0;
                 _stream->ReadBuffer(
-                    &idx, typeByte -
-                              static_cast<std::int8_t>(PSBObjType::StringN1) + 1);
+                    &idx,
+                    typeByte - static_cast<std::int8_t>(PSBObjType::StringN1) +
+                        1);
                 _stream->SetPosition(_header.offsetStringsData +
                                      stringOffsets.value.at(idx));
                 output = Extension::readStringZeroTrim(_stream.get());
@@ -198,7 +199,7 @@ namespace {
     }
 
     tTJSVariant PSBFile::readAllObjs(const ttstr & /*key*/,
-                                      tjs_uint32 objOffset) {
+                                     tjs_uint32 objOffset) {
         _stream->SetPosition(objOffset);
         const auto typeByte = _stream->ReadI8LE();
         switch(static_cast<PSBObjType>(typeByte)) {
@@ -207,7 +208,8 @@ namespace {
                 return tTJSVariant();
             case PSBObjType::False:
             case PSBObjType::True:
-                return tTJSVariant(typeByte == static_cast<std::int8_t>(PSBObjType::True));
+                return tTJSVariant(typeByte ==
+                                   static_cast<std::int8_t>(PSBObjType::True));
             case PSBObjType::NumberN0:
                 return tTJSVariant(0);
             case PSBObjType::NumberN1: {
@@ -234,23 +236,24 @@ namespace {
             case PSBObjType::NumberN5: {
                 tjs_int64 val64 = 0;
                 _stream->ReadBuffer(&val64, 5);
-                val64 |= ((val64 & 0x8000000000LL) == 0 ? 0 : 0xFFFFFFFF00000000LL);
+                val64 |=
+                    ((val64 & 0x8000000000LL) == 0 ? 0 : 0xFFFFFFFF00000000LL);
                 return tTJSVariant(val64);
             }
             case PSBObjType::NumberN6: {
                 tjs_int64 val64 = 0;
                 _stream->ReadBuffer(&val64, 6);
-                val64 |= ((val64 & 0x800000000000LL) == 0
-                              ? 0
-                              : 0xFFFFFF0000000000LL);
+                val64 |=
+                    ((val64 & 0x800000000000LL) == 0 ? 0
+                                                     : 0xFFFFFF0000000000LL);
                 return tTJSVariant(val64);
             }
             case PSBObjType::NumberN7: {
                 tjs_int64 val64 = 0;
                 _stream->ReadBuffer(&val64, 7);
-                val64 |= ((val64 & 0x80000000000000LL) == 0
-                              ? 0
-                              : 0xFFFF000000000000LL);
+                val64 |=
+                    ((val64 & 0x80000000000000LL) == 0 ? 0
+                                                       : 0xFFFF000000000000LL);
                 return tTJSVariant(val64);
             }
             case PSBObjType::NumberN8: {
@@ -346,13 +349,13 @@ namespace {
                 }
 
                 iTJSDispatch2 *dsp = TJSCreateDictionaryObject();
-                for(tjs_int i = 0; i < static_cast<tjs_int>(objsNamesIdx.size());
-                    ++i) {
+                for(tjs_int i = 0;
+                    i < static_cast<tjs_int>(objsNamesIdx.size()); ++i) {
                     const ttstr keyName = names.at(objsNamesIdx.at(i));
                     tTJSVariant obj =
                         readAllObjs(keyName, tmpOffset + objsOffset.at(i));
-                    dsp->PropSet(TJS_MEMBERENSURE, keyName.c_str(), nullptr, &obj,
-                                 dsp);
+                    dsp->PropSet(TJS_MEMBERENSURE, keyName.c_str(), nullptr,
+                                 &obj, dsp);
                 }
                 tTJSVariant result(dsp, dsp);
                 dsp->Release();
