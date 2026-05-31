@@ -7,6 +7,9 @@ target_sources(${PROJECT_NAME} PUBLIC
     main.cpp
     PSBValue.cpp
     PSBFile.cpp
+    PSBOffsetReader.cpp
+    PSBStreamDecompress.cpp
+    PSBLz4Stream.cpp
     PSBMedia.cpp
     PSBMediaRegistry.cpp
     types/PimgType.cpp
@@ -21,3 +24,6 @@ target_sources(${PROJECT_NAME} PUBLIC
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE krkr2plugin)
+
+find_package(ZLIB REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE ZLIB::ZLIB)

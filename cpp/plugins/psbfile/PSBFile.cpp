@@ -1,3 +1,5 @@
+#include "PSBStreamDecompress.h"
+
 #include "PSBFile.h"
 
 #include <iostream>
@@ -6,10 +8,13 @@
 
 #include "EMoteCTX.h"
 #include "ncbind.hpp"
+#include "xp3filter.h"
 
 #define LOGGER spdlog::get("plugin")
 
 namespace PSB {
+
+    PSBFile::~PSBFile() = default;
 
     void PSBFile::loadKeys(TJS::tTJSBinaryStream *stream) {
         const size_t len = nameIndexes.value.size();
@@ -319,67 +324,30 @@ namespace PSB {
         }
     }
 
-    bool PSBFile::loadPSBFile(const ttstr &filePath) {
-        LOGGER->debug("load psb file: {}", filePath.AsStdString());
-        auto *s = TVPCreateStream(filePath);
-        if(!s)
-            return false;
-
-        const size_t readSize = s->GetSize();
-        if(readSize < 9)
-            return false;
-
-        tTVPMemoryStream stream{ nullptr, static_cast<tjs_uint>(readSize) };
-        s->Read(stream.GetInternalBuffer(), readSize);
-        delete s;
-
-        constexpr int signSize = 4;
-        char sign[signSize];
-        stream.Read(sign, signSize);
-
-        if(10 < readSize && std::strcmp(sign, "MDF") == 0) {
-            // auto originalLen = readSize - 8;
-            // uLong compressedLen = compressBound(originalLen);
-            // auto *compressed = new Bytef[compressedLen];
-            // stream = uncompress(compressed, &compressedLen,
-            //                       reinterpret_cast<const Bytef *>(buffer[2]),
-            //                       originalLen);
-            // if(code == 0) {
-            //     delete[] buffer;
-            //     return false;
-            // }
-            LOGGER->info("PSBFile::load MDF not implement!");
-        }
-
-        stream.SetPosition(0);
-        _header = PSB::parsePSBHeader(&stream);
+    bool PSBFile::loadFromStream(TJS::tTJSBinaryStream *stream) {
+        stream->SetPosition(0);
+        _header = PSB::parsePSBHeader(stream);
 
         if(_seed > 0) {
-            // decrypt
-
-            uint32_t key[4];
-
+            std::uint32_t key[4];
             key[0] = 0x075BCD15;
             key[1] = 0x159A55E5;
             key[2] = 0x1F123BB5;
-            key[3] = _seed;
+            key[3] = static_cast<std::uint32_t>(_seed);
             EMoteCTX emoteCtx{};
             init_emote_ctx(&emoteCtx, key);
 
             if(_header.isEncrypted() &&
-               _header.GetHeaderLength() > stream.GetSize()) {
-
+               _header.GetHeaderLength() > stream->GetSize()) {
                 emote_decrypt(
                     &emoteCtx,
-                    reinterpret_cast<std::uint8_t *>(&_header.offsetEncrypt),
-                    4);
+                    reinterpret_cast<std::uint8_t *>(&_header.offsetEncrypt), 4);
                 emote_decrypt(
                     &emoteCtx,
                     reinterpret_cast<std::uint8_t *>(&_header.offsetNames), 4);
                 emote_decrypt(
                     &emoteCtx,
-                    reinterpret_cast<std::uint8_t *>(&_header.offsetStrings),
-                    4);
+                    reinterpret_cast<std::uint8_t *>(&_header.offsetStrings), 4);
                 emote_decrypt(&emoteCtx,
                               reinterpret_cast<std::uint8_t *>(
                                   &_header.offsetStringsData),
@@ -424,12 +392,34 @@ namespace PSB {
             }
 
             if(_header.version == 2) {
-                emote_decrypt(
-                    &emoteCtx,
-                    &static_cast<std::uint8_t *>(
-                        stream.GetInternalBuffer())[_header.offsetEncrypt],
-                    _header.offsetChunkOffsets - _header.offsetEncrypt);
+                auto *memStream = dynamic_cast<tTVPMemoryStream *>(stream);
+                if(memStream != nullptr) {
+                    emote_decrypt(
+                        &emoteCtx,
+                        &static_cast<std::uint8_t *>(
+                            memStream->GetInternalBuffer())[_header.offsetEncrypt],
+                        _header.offsetChunkOffsets - _header.offsetEncrypt);
+                }
             }
+        }
+
+        if(_decryptClo.Object != NULL) {
+            auto decrypted = std::make_unique<tTVPMemoryStream>(
+                nullptr, static_cast<tjs_uint>(stream->GetSize()));
+            stream->SetPosition(0);
+            stream->ReadBuffer(decrypted->GetInternalBuffer(), stream->GetSize());
+            auto *cba = new CBinaryAccessor(
+                reinterpret_cast<unsigned char *>(decrypted->GetInternalBuffer()),
+                decrypted->GetSize());
+            tTJSVariant buff(cba);
+            cba->Release();
+            tTJSVariant bufferLen(static_cast<tjs_int>(decrypted->GetSize()));
+            tTJSVariant *vars[] = { &buff, &bufferLen };
+            _decryptClo.FuncCall(0, NULL, NULL, NULL, 2, vars, NULL);
+            _stream = std::move(decrypted);
+            stream = _stream.get();
+            stream->SetPosition(0);
+            _header = PSB::parsePSBHeader(stream);
         }
 
         if(std::strcmp(_header.signature, PSB::PsbSignature) != 0) {
@@ -437,7 +427,7 @@ namespace PSB {
         }
 
         if(_header.isEncrypted() &&
-           _header.GetHeaderLength() > stream.GetSize() && _seed == 0) {
+           _header.GetHeaderLength() > stream->GetSize() && _seed == 0) {
             LOGGER->critical("psb file is encrypted");
             return false;
         }
@@ -447,90 +437,114 @@ namespace PSB {
             return false;
         }
 
-        // Pre Load Strings
-        stream.SetPosition(_header.offsetStrings);
+        stream->SetPosition(_header.offsetStrings);
         stringOffsets = PSB::PSBArray(
-            stream.ReadI8LE() -
+            stream->ReadI8LE() -
                 static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-            &stream);
+            stream);
 
-        // Load Names
         if(_header.version == 1) {
-            // don't believe HeaderLength
-            if(_header.offsetEncrypt >= stream.GetSize()) {
+            if(_header.offsetEncrypt >= stream->GetSize()) {
                 _header.offsetEncrypt = _header.GetHeaderLength();
             }
-            stream.SetPosition(_header.offsetEncrypt);
+            stream->SetPosition(_header.offsetEncrypt);
             nameIndexes = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
-            loadKeys(&stream);
+                stream);
+            loadKeys(stream);
         } else {
-            stream.SetPosition(_header.offsetNames);
+            stream->SetPosition(_header.offsetNames);
             charset = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
+                stream);
             namesData = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
+                stream);
             nameIndexes = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
+                stream);
             loadNames();
         }
 
-        // Pre Load Resources (Chunks)
-        stream.SetPosition(_header.offsetChunkOffsets);
+        stream->SetPosition(_header.offsetChunkOffsets);
         chunkOffsets = PSB::PSBArray(
-            stream.ReadI8LE() -
+            stream->ReadI8LE() -
                 static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-            &stream);
-        stream.SetPosition(_header.offsetChunkLengths);
+            stream);
+        stream->SetPosition(_header.offsetChunkLengths);
         chunkLengths = PSB::PSBArray(
-            stream.ReadI8LE() -
+            stream->ReadI8LE() -
                 static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-            &stream);
+            stream);
 
+        resources.clear();
         resources.reserve(chunkLengths.value.size());
 
         if(_header.version >= 4) {
-            // Pre Load Extra Resources (Chunks)
-            stream.SetPosition(_header.offsetExtraChunkOffsets);
+            stream->SetPosition(_header.offsetExtraChunkOffsets);
             extraChunkOffsets = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
-            stream.SetPosition(_header.offsetExtraChunkLengths);
+                stream);
+            stream->SetPosition(_header.offsetExtraChunkLengths);
             extraChunkLengths = PSB::PSBArray(
-                stream.ReadI8LE() -
+                stream->ReadI8LE() -
                     static_cast<std::uint8_t>(PSB::PSBObjType::ArrayN1) + 1,
-                &stream);
+                stream);
+            extraResources.clear();
             extraResources.reserve(extraChunkLengths.value.size());
         }
-        // Load Entries
-        stream.SetPosition(_header.offsetEntries);
-        auto obj = unpack(&stream);
+
+        stream->SetPosition(_header.offsetEntries);
+        auto obj = unpack(stream);
         if(!obj) {
             LOGGER->error("Can not parse objects");
+            return false;
         }
 
         _root = std::move(obj);
-        // Load Resource
         for(auto &res : resources) {
-            loadResource(*res, &stream);
+            loadResource(*res, stream);
         }
 
         if(_header.version >= 4) {
             for(auto &res : extraResources) {
-                loadExtraResource(*res, &stream);
+                loadExtraResource(*res, stream);
             }
         }
 
         afterLoad();
+        return true;
+    }
+
+    bool PSBFile::loadPSBFile(const ttstr &filePath) {
+        LOGGER->debug("load psb file: {}", filePath.AsStdString());
+        auto *rawStream = TVPCreateStream(filePath);
+        if(!rawStream) {
+            return false;
+        }
+
+        try {
+            _stream = openDecompressedStream(rawStream);
+        } catch(const std::exception &ex) {
+            LOGGER->error("failed to decompress psb stream: {}", ex.what());
+            delete rawStream;
+            return false;
+        }
+        delete rawStream;
+
+        if(!_stream) {
+            return false;
+        }
+
+        if(!loadFromStream(_stream.get())) {
+            _stream.reset();
+            return false;
+        }
 
         return true;
     }

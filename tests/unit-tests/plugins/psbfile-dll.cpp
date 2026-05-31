@@ -2,10 +2,14 @@
 // Created by lidong on 25-6-21.
 //
 
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <vector>
+
 #include <catch2/catch_test_macros.hpp>
 
-#include "LayerBitmapIntf.h"
-#include "StorageIntf.h"
 #include "psbfile/PSBFile.h"
 #include "test_config.h"
 
@@ -206,10 +210,12 @@ TEST_CASE("read psbfile ezsave.pimg") {
 }
 
 TEST_CASE("read psbfile e-mote3.0 psb") {
-    int key = 742877301;
+    constexpr int key = 742877301;
     PSB::PSBFile f;
     f.setSeed(key);
     REQUIRE(
         f.loadPSBFile(TEST_FILES_PATH "/emote/e-mote3.0バニラパジャマa.psb"));
     REQUIRE(f.getType() == PSB::PSBType::Motion);
+    auto objs = f.getObjects();
+    REQUIRE(objs != nullptr);
 }

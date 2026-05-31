@@ -12,6 +12,16 @@
 #include "tjsObject.h"
 
 namespace PSB {
+namespace {
+
+    bool isNumericRealType(PSBObjType type) {
+        return (type >= PSBObjType::NumberN0 && type <= PSBObjType::NumberN8) ||
+               type == PSBObjType::Float0 || type == PSBObjType::Float ||
+               type == PSBObjType::Double;
+    }
+
+} // namespace
+
     PSBNumber::PSBNumber(PSBObjType objType, TJS::tTJSBinaryStream *stream) {
         switch(objType) {
             case PSBObjType::NumberN0:
@@ -90,6 +100,14 @@ namespace PSB {
 
 
     std::int64_t PSBNumber::getLongValue() const {
+        switch(numberType) {
+            case PSBNumberType::Int:
+                return static_cast<std::int64_t>(getValue<int>());
+            case PSBNumberType::Long:
+                return getValue<std::int64_t>();
+            default:
+                break;
+        }
         return BitConverter::fromByteArray<std::int64_t>(data);
     }
 
@@ -208,6 +226,58 @@ namespace PSB {
         tTJSVariant result(array, array);
         array->Release();
         return result;
+    }
+
+    bool readIntegerValue(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                          std::int64_t &output) {
+        if(type == PSBObjType::Null) {
+            return false;
+        }
+        if(type < PSBObjType::NumberN0 || type > PSBObjType::NumberN8) {
+            return false;
+        }
+        PSBNumber num(type, stream);
+        output = num.getLongValue();
+        return true;
+    }
+
+    bool readRealValue(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                       double &output) {
+        if(type == PSBObjType::Null || !isNumericRealType(type)) {
+            return false;
+        }
+        PSBNumber num(type, stream);
+        switch(num.numberType) {
+            case PSBNumberType::Float:
+                output = num.getFloatValue();
+                return true;
+            case PSBNumberType::Double:
+                output = num.getValue<double>();
+                return true;
+            case PSBNumberType::Int:
+                output = static_cast<double>(num.getValue<int>());
+                return true;
+            case PSBNumberType::Long:
+                output = static_cast<double>(num.getLongValue());
+                return true;
+        }
+        return false;
+    }
+
+    bool readResourceIndex(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                           std::int32_t &output) {
+        if(type < PSBObjType::ResourceN1 || type > PSBObjType::ResourceN4) {
+            return false;
+        }
+        const int indexBytes =
+            static_cast<int>(type) -
+            static_cast<int>(PSBObjType::ResourceN1) + 1;
+        PSBResource res(indexBytes, stream);
+        if(!res.index.has_value()) {
+            return false;
+        }
+        output = static_cast<std::int32_t>(res.index.value());
+        return true;
     }
 
 } // namespace PSB

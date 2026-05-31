@@ -5,6 +5,7 @@ add_library(${PROJECT_NAME} STATIC)
 
 target_sources(${PROJECT_NAME} PUBLIC
     KAGParser/kagparserex.cpp
+    EmotePlayer.cpp
     TextRender.cpp
     scriptsEx.cpp
     win32dialog.cpp

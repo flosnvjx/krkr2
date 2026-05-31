@@ -499,4 +499,11 @@ namespace PSB {
     private:
         Vec _vec{};
     };
+
+    bool readIntegerValue(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                          std::int64_t &output);
+    bool readRealValue(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                       double &output);
+    bool readResourceIndex(PSBObjType type, TJS::tTJSBinaryStream *stream,
+                           std::int32_t &output);
 } // namespace PSB

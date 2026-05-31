@@ -3,6 +3,7 @@
 //
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -17,8 +18,11 @@ namespace BitConverter {
 
     template <typename T>
     T fromByteArray(const std::vector<std::uint8_t> &bytes) {
-        T value;
-        std::memcpy(&value, bytes.data(), sizeof(T));
+        T value{};
+        const auto copySize = std::min(bytes.size(), sizeof(T));
+        if(copySize > 0) {
+            std::memcpy(&value, bytes.data(), copySize);
+        }
         return value;
     }
 } // namespace BitConverter

@@ -1,11 +1,19 @@
 #pragma once
 
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <spdlog/spdlog.h>
 
 #include "tjs.h"
 #include "PSB.h"
 #include "PSBHeader.h"
 #include "PSBValue.h"
+
+class tTVPMemoryStream;
 
 namespace PSB {
 
@@ -28,17 +36,43 @@ namespace PSB {
         std::vector<std::shared_ptr<PSBResource>> extraResources;
 
         explicit PSBFile() = default;
+        ~PSBFile();
 
         void loadKeys(TJS::tTJSBinaryStream *stream);
         void loadNames();
 
         void setSeed(int seed) { this->_seed = seed; }
+        int getSeed() const { return this->_seed; }
+
+        void setDecryptCallback(tTJSVariantClosure decryptClo) {
+            _decryptClo = decryptClo;
+        }
 
         /**
          * file type: *.PIMG
          * @param filePath
          */
         bool loadPSBFile(const ttstr &filePath);
+
+        // Offset-based readers used by emotefile / motionplayer.
+        tTJSVariant readAllObjs(const ttstr &key, tjs_uint32 objOffset);
+        std::uint32_t readListInfo(std::vector<std::uint32_t> *target);
+        void refreshListInfo(std::vector<std::uint32_t> *target1,
+                             std::vector<std::uint32_t> *target2);
+        bool parseObject(std::map<std::string, std::uint32_t> &output,
+                         std::uint32_t objOffset);
+        bool parseNumber(std::int64_t &output, std::uint32_t objOffset);
+        bool parseReal(double &output, std::uint32_t objOffset);
+        bool parseString(std::string &output, std::uint32_t objOffset);
+        bool parseList(std::vector<std::uint32_t> &output,
+                       std::uint32_t objOffset);
+        bool parseResource(std::int32_t &id, std::uint32_t objOffset);
+        [[nodiscard]] std::uint64_t getDataSize() const;
+        void readAllData(std::uint8_t *output, std::uint32_t outputLen) const;
+        bool readChunkData(std::int32_t chunkId, std::uint8_t *buffer,
+                           std::uint32_t size) const;
+        [[nodiscard]] const PSBArray &getChunkOffsets() const;
+        [[nodiscard]] const PSBArray &getChunkLengths() const;
         /**
          * Load a string based on index, lift stream Position
          */
@@ -89,8 +123,12 @@ namespace PSB {
         PSBType getType() const { return _type; }
 
     private:
-        int _seed;
+        bool loadFromStream(TJS::tTJSBinaryStream *stream);
+
+        int _seed = 0;
         PSBHeader _header{};
+        std::unique_ptr<tTVPMemoryStream> _stream{};
+        tTJSVariantClosure _decryptClo = NULL;
         std::shared_ptr<IPSBValue> _root{};
         PSBType _type{ PSBType::PSB };
 
