@@ -11,28 +11,7 @@ if(WINDOWS)
             windows/LayerExDraw.cpp
     )
 else()
-
     find_package(blend2d CONFIG REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE blend2d::blend2d)
-    target_sources(${PROJECT_NAME} PUBLIC
-#            blend2d/main.cpp
-            blend2d/LayerExDraw.cpp
-#            blend2d/DrawPath.cpp
-    )
-    #    target_sources(${PROJECT_NAME} PUBLIC
-#            general/main.cpp
-#            general/LayerExDraw.cpp
-#            general/DrawPath.cpp
-#    )
-#
-#    find_package(libgdiplus CONFIG REQUIRED)
-#    target_link_libraries(${PROJECT_NAME} PRIVATE libgdiplus::libgdiplus)
-#
-#    set(VCPKG_INSTALL_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
-#
-#    # glibconfig
-#    # https://invent.kde.org/frameworks/extra-cmake-modules/-/blob/master/find-modules/FindGLIB2.cmake
-#    target_include_directories(${PROJECT_NAME} PUBLIC "${VCPKG_INSTALL_DIR}/lib/glib-2.0/include")
-#    target_include_directories(${PROJECT_NAME} PUBLIC "${VCPKG_INSTALL_DIR}/include/glib-2.0")
-
+    target_sources(${PROJECT_NAME} PUBLIC blend2d/LayerExDraw.cpp)
 endif ()

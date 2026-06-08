@@ -104,7 +104,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
   ./platforms/android/gradlew -p ./platforms/android assembleDebug
   ```
 
-  > If you encounter `glib` installation issues, see [FAQ#安装glib失败](./doc/FAQ.md#安装glib失败)
+  > If you encounter `glib` installation issues, see [FAQ#安装glib失败](./docs/FAQ.md#安装glib失败)
 
 * **Windows**:
 
@@ -162,7 +162,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
 
 ## Supported Games
 
-* See [games list](./doc/support_games.txt)
+* See [games list](./docs/support_games.txt)
 
 ---
 

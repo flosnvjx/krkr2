@@ -35,7 +35,7 @@ namespace PSB {
         PSBArray extraChunkLengths{};
         std::vector<std::shared_ptr<PSBResource>> extraResources;
 
-        explicit PSBFile() = default;
+        PSBFile();
         ~PSBFile();
 
         void loadKeys(TJS::tTJSBinaryStream *stream);

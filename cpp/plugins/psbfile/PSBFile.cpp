@@ -14,6 +14,7 @@
 
 namespace PSB {
 
+    PSBFile::PSBFile() = default;
     PSBFile::~PSBFile() = default;
 
     void PSBFile::loadKeys(TJS::tTJSBinaryStream *stream) {
