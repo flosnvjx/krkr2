@@ -9,6 +9,7 @@ set(CORE_STORAGE_SOURCE_FILES
     ${BASE_PATH}/StorageIntf.cpp
     ${BASE_PATH}/UtilStreams.cpp
     ${STORAGE_PATH}/impl/ArchiveRegistry.cpp
+    ${STORAGE_PATH}/impl/ArchiveFilename.cpp
     ${STORAGE_PATH}/ToolStorageInit.cpp
 )
 

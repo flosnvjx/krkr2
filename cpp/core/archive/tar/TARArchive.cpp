@@ -1,25 +1,13 @@
 #include "tjsCommHead.h"
 #include "StorageIntf.h"
 #include "UtilStreams.h"
-#include "Platform.h"
-#include "MsgIntf.h"
+#include "ArchiveFilename.h"
 #include <algorithm>
+#include <cstring>
 
 void TVPFreeArchiveHandlePoolByPointer(void *pointer);
 
 void TVPReleaseCachedArchiveHandle(void *pointer, tTJSBinaryStream *stream);
-
-void storeFilename(ttstr &name, const char *narrowName, const ttstr &filename) {
-    tjs_int len = TJS_narrowtowidelen(narrowName);
-    if(len == -1) {
-        ttstr msg("Filename is not encoded in UTF8 in archive:\n");
-        TVPShowSimpleMessageBox(msg + filename, TJS_W("Error"));
-        TVPThrowExceptionMessage(TJS_W("Invalid archive entry name"));
-    }
-    tjs_char *p = name.AllocBuffer(len);
-    p[TJS_narrowtowide(p, narrowName, len)] = 0;
-    name.FixLen();
-}
 
 //---------------------------------------------------------------------------
 // tar archive
@@ -80,12 +68,28 @@ public:
                 if(tar_header.dbuf.typeflag ==
                    LONGLINK) { // tar_header.dbuf.name ==
                                // "././@LongLink"
-                    unsigned int readsize =
-                        (original_size + (TBLOCK - 1)) & ~(TBLOCK - 1);
-                    filename.resize(readsize + 1); // TODO:size lost
-                    if(_instr->Read(&filename[0], readsize) != readsize)
+                    const unsigned int readsize = static_cast<unsigned int>(
+                        (original_size + (TBLOCK - 1)) & ~(TBLOCK - 1));
+                    std::vector<char> block(readsize);
+                    if(_instr->Read(block.data(), readsize) != readsize)
                         break;
-                    filename[readsize] = 0;
+
+                    size_t name_len = static_cast<size_t>(original_size);
+                    if(name_len > block.size())
+                        name_len = block.size();
+                    const char *end = static_cast<const char *>(
+                        memchr(block.data(), '\0', name_len));
+                    if(end)
+                        name_len = static_cast<size_t>(end - block.data());
+                    while(name_len > 0 &&
+                          (block[name_len - 1] == '\n' ||
+                           block[name_len - 1] == '\0'))
+                        name_len--;
+
+                    filename.resize(name_len + 1);
+                    if(name_len > 0)
+                        memcpy(filename.data(), block.data(), name_len);
+                    filename[name_len] = '\0';
                     if(_instr->Read(&tar_header, sizeof(tar_header)) !=
                        sizeof(tar_header))
                         break;

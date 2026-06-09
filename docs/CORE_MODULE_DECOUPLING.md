@@ -498,7 +498,7 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 | 阶段 | 状态 | 内容 |
 |------|------|------|
 | Phase 1 | ✅ 完成 | `core_io`、`archive_xp3`、`core_storage_tool`、xp3 轻量链接 |
-| Phase 2 | 🔄 进行中 | IFileBackend、归档注册、`core_storage`、去 base 反向依赖 |
+| Phase 2 | ✅ 基本完成 | IFileBackend、归档拆分、`core_storage`、工具链 `core_storage_tool` |
 | Phase 3 | ⏳ 待做 | 拆 `core_base` → event/msg/sysinit/script |
 | Phase 4 | ⏳ 待做 | CMake 去环、environ 组合根 |
 | Phase 5 | ⏳ 可选 | `krkr2core` 接口库细化 |
@@ -512,15 +512,15 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 - `StorageImpl` 去掉无用 `WindowImpl.h`
 - `ArchiveRegistry`：归档 creator 注册表（引擎 ZIP/7z/TAR/XP3；工具仅 XP3）
 - **`core_storage` 库** — `StorageIntf`、`UtilStreams`、`ArchiveRegistry`、`TVPInitToolStorage()`；`base` 链 `core_storage`，引擎归档由 `TVPInitEngineArchiveCreators()` 注册
-- **`archive_zip`** — `ZIPArchive.cpp` 迁至 `cpp/core/archive/zip/`
+- **`archive_zip` / `archive_7z` / `archive_tar`** — 从 `base` 迁出；`storeFilename` 提取至 `core_storage/impl/ArchiveFilename.cpp`
 - **`core_storage_tool`** — 原 `storage_min` 迁至 `cpp/core/storage/tool/`，xp3 改链
 
-### Phase 2 下一步（建议顺序）
+### Phase 2 遗留 / Phase 3 入口
 
-1. ~~**抽出 `core_storage` 库**~~ ✅ — 见 `cpp/core/storage/`；`LocalFileBackend` 仍留 `base`（依赖 `tTVPLocalFileStream`）
-2. **拆 `archive_zip` / `archive_7z` / `archive_tar`** — `archive_zip` ✅；7z/TAR 待拆
-3. ~~**吸收 `core_storage_min`**~~ ✅ — 迁至 `cpp/core/storage/tool/`（`core_storage_tool`）；xp3 已改链；完整 `core_storage` 待 `TVPCreateStream` 拆分后
-4. **CI 模块依赖图** — 禁止新增环
+1. **xp3 链完整 `core_storage`** — 需将 `TVPCreateStream` 从 `StorageIntf.cpp` 拆出（引擎版 vs 工具版）
+2. **`TArchiveStream` 下沉 `core_storage`** — 目前实现仍在 `StorageImpl.cpp`，归档库在最终链接时解析
+3. **CI 模块依赖图** — 禁止新增环
+4. **Phase 3** — 拆 `base` → event/msg/sysinit/script；CMake 去环
 
 ---
 
@@ -551,7 +551,9 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 | `core_io` | `cpp/core/io/` | `IFileBackend`、`StdFileBackend`、`tTVPLocalFileStream` |
 | `archive_xp3` | `cpp/core/archive/xp3/` | `XP3Archive.cpp/h` 从 `base` 迁出 |
 | `core_storage_tool` | `cpp/core/storage/tool/` | 工具链专用存储层 + 运行时桩（原 `storage_min`） |
-| `archive_zip` | `cpp/core/archive/zip/` | ZIP 归档（从 `base` 迁出） |
+| `archive_zip` | `cpp/core/archive/zip/` | ZIP 归档 |
+| `archive_7z` | `cpp/core/archive/7z/` | 7z 归档 |
+| `archive_tar` | `cpp/core/archive/tar/` | TAR 归档 |
 | `xp3` 工具 | `tools/xp3/CMakeLists.txt` | 链接 `tjs2 + core_io + core_storage_tool`，不再链接 `core_base_module` |
 
 `core_base_module` 改为 `PUBLIC` 链接 `archive_xp3`，主程序行为不变。

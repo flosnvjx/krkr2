@@ -9,7 +9,6 @@ extern "C" {
 #include <7zip/C/7zCrc.h>
 }
 
-#include "StorageImpl.h"
 
 static ISzAlloc allocImp = { [](ISzAllocPtr p, size_t size) -> void * {
                                 return malloc(size);

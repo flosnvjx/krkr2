@@ -1,6 +1,7 @@
 #include "tjsCommHead.h"
 #include "StorageIntf.h"
 #include "UtilStreams.h"
+#include "ArchiveFilename.h"
 #include <algorithm>
 
 #ifndef NOUNCRYPT
@@ -2102,8 +2103,6 @@ ZipArchive::~ZipArchive() {
         _st = nullptr;
     }
 }
-
-void storeFilename(ttstr &name, const char *narrowName, const ttstr &filename);
 
 ZipArchive::ZipArchive(const ttstr &name, tTJSBinaryStream *st,
                        bool normalizeFileName) : tTVPArchive(name) {
