@@ -14,9 +14,10 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/stat.h>
-#include <cocos/cocos2d.h>
 
+#include "IFileBackend.h"
 #include "MsgIntf.h"
+#include "TVPPlatform.h"
 
 #include "StorageImpl.h"
 #include "WindowImpl.h"
@@ -46,7 +47,7 @@ inline unsigned int lseek64(int fileHandle, __int64 offset, int origin) {
 // extern void vfree(void *p);
 // }
 #endif
-#ifdef CC_TARGET_OS_IPHONE
+#ifdef TVP_PLATFORM_IOS
 #define lseek64 lseek
 #endif
 
@@ -138,7 +139,13 @@ tTJSBinaryStream *tTVPFileMedia::Open(const ttstr &name, tjs_uint32 flags) {
     ttstr _name(name);
     GetLocalName(_name);
 
-    return new tTVPLocalFileStream(origname, _name, flags);
+    if(!TVPGetFileBackend())
+        TVPInitFileBackend();
+
+    if(auto stream = TVPGetFileBackend()->Open(origname, _name, flags))
+        return stream.release();
+
+    TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
 }
 
 void TVPListDir(const std::string &u8folder,
@@ -269,7 +276,7 @@ static int _utf8_strcasecmp(const char *a, const char *b) {
     return *a - *b;
 }
 
-#if CC_TARGET_PLATFORM == CC_PLATFORM_IOS
+#if defined(TVP_PLATFORM_IOS)
 const std::vector<std::string> &TVPGetApplicationHomeDirectory();
 const std::vector<ttstr> &_getPrefixPath() {
     static std::vector<ttstr> ret;
@@ -338,7 +345,7 @@ void tTVPFileMedia::GetLocallyAccessibleName(ttstr &name) {
         ptr += 2; // skip "./"
         newname.Clear();
     }
-#if CC_TARGET_PLATFORM == CC_PLATFORM_IOS
+#if defined(TVP_PLATFORM_IOS)
     {
         std::string prefix = "/";
         prefix += tTJSNarrowStringHolder(ptr).Buf;

@@ -8,6 +8,7 @@ endif()
 set(ENVIRON_PATH ${CMAKE_CURRENT_LIST_DIR})
 set(ENVIRON_SOURCE_FILES
     ${ENVIRON_PATH}/Application.cpp
+    ${ENVIRON_PATH}/EnvironFileBackendInit.cpp
     ${ENVIRON_PATH}/DetectCPU.cpp
     ${ENVIRON_PATH}/DumpSend.cpp
     ${ENVIRON_PATH}/XP3ArchiveRepack.cpp
@@ -61,9 +62,20 @@ set(ENVIRON_HEADERS_DIR
     ${ENVIRON_PATH}/sdl
 )
 
+if(ANDROID OR IOS)
+    list(APPEND ENVIRON_SOURCE_FILES
+        ${ENVIRON_PATH}/CocosFileBackend.cpp
+        ${ENVIRON_PATH}/MobileFileBackend.cpp
+    )
+endif()
+
 add_library(${PROJECT_NAME} STATIC ${ENVIRON_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${ENVIRON_HEADERS_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 PRIVATE core_base_module core_visual_module core_sound_module core_plugin_module core_movie_module core_utils_module)
+target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 PRIVATE core_base_module core_io core_visual_module core_sound_module core_plugin_module core_movie_module core_utils_module)
+
+if(ANDROID OR IOS)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE TVP_HAS_MOBILE_FILE_BACKEND)
+endif()
 
 find_package(cocos2dx CONFIG REQUIRED)
 find_package(7zip CONFIG REQUIRED)

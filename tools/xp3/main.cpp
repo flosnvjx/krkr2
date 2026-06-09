@@ -4,7 +4,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-#include "XP3Archive.h"
+#include "StorageIntf.h"
 
 namespace fs = std::filesystem;
 
