@@ -11,10 +11,4 @@ set(IO_SOURCE_FILES
 
 add_library(${PROJECT_NAME} STATIC ${IO_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${IO_PATH})
-target_link_libraries(${PROJECT_NAME} PUBLIC tjs2)
-
-# MsgIntf 仅用于 TVPThrowExceptionMessage / TVPWriteError 等声明
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/cpp/core/base
-    ${CMAKE_SOURCE_DIR}/cpp/core/base/impl
-)
+target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 PRIVATE core_msg)

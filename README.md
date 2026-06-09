@@ -1,5 +1,13 @@
 # KrKr2 Emulator
 
+<p align="center">
+  <a href="https://github.com/2468785842/krkr2/actions/workflows/ci.yml"><img src="https://github.com/2468785842/krkr2/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Status"></a>
+  <a href="https://github.com/2468785842/krkr2/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/2468785842/krkr2/ci.yml?branch=main&label=format-check&logo=githubactions" alt="Format Check"></a>
+  <a href="https://github.com/2468785842/krkr2/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/2468785842/krkr2/ci.yml?branch=main&label=linux&logo=githubactions" alt="Linux Build"></a>
+  <a href="https://github.com/2468785842/krkr2/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/2468785842/krkr2/ci.yml?branch=main&label=windows&logo=githubactions" alt="Windows Build"></a>
+  <a href="https://github.com/2468785842/krkr2/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/2468785842/krkr2/ci.yml?branch=main&label=android&logo=githubactions" alt="Android Build"></a>
+</p>
+
 This repository contains the **KrKr2 Emulator**, a cross-platform emulator designed to run games made with the **KiriKiri engine** (also known as T Visual Presenter).  
 It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriKiri engine games on multiple platforms.  
 

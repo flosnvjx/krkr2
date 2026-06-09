@@ -1,32 +1,8 @@
 name: Code Format Check
 
 on:
+  workflow_call:
   workflow_dispatch:
-
-  push:
-    branches: [ main ]
-    paths:
-      - 'cmake/**'
-      - 'cpp/**'
-      - 'platforms/**'
-      - 'vcpkg/**'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'vcpkg.json'
-      - 'vcpkg-configuration.json'
-      - '.github/workflows/**'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'cmake/**'
-      - 'cpp/**'
-      - 'platforms/**'
-      - 'vcpkg/**'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'vcpkg.json'
-      - 'vcpkg-configuration.json'
-      - '.github/workflows/**'
 
 jobs:
   format-check:

@@ -499,7 +499,7 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 |------|------|------|
 | Phase 1 | ✅ 完成 | `core_io`、`archive_xp3`、`core_storage_tool`、xp3 轻量链接 |
 | Phase 2 | ✅ 基本完成 | IFileBackend、归档拆分、`core_storage`、工具链 `core_storage_tool` |
-| Phase 3 | ⏳ 待做 | 拆 `core_base` → event/msg/sysinit/script |
+| Phase 3 | 🔄 进行中 | `TArchiveStream` 下沉、CI 依赖检查、拆 `base` 子模块 |
 | Phase 4 | ⏳ 待做 | CMake 去环、environ 组合根 |
 | Phase 5 | ⏳ 可选 | `krkr2core` 接口库细化 |
 
@@ -515,12 +515,25 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 - **`archive_zip` / `archive_7z` / `archive_tar`** — 从 `base` 迁出；`storeFilename` 提取至 `core_storage/impl/ArchiveFilename.cpp`
 - **`core_storage_tool`** — 原 `storage_min` 迁至 `cpp/core/storage/tool/`，xp3 改链
 
-### Phase 2 遗留 / Phase 3 入口
+### Phase 2 遗留
 
 1. **xp3 链完整 `core_storage`** — 需将 `TVPCreateStream` 从 `StorageIntf.cpp` 拆出（引擎版 vs 工具版）
-2. **`TArchiveStream` 下沉 `core_storage`** — 目前实现仍在 `StorageImpl.cpp`，归档库在最终链接时解析
-3. **CI 模块依赖图** — 禁止新增环
-4. **Phase 3** — 拆 `base` → event/msg/sysinit/script；CMake 去环
+
+### Phase 3 已完成（起步）
+
+| 改动 | 说明 |
+|------|------|
+| `core_storage/impl/ArchiveStream.cpp` | `TArchiveStream` 从 `StorageImpl.cpp` 迁出 |
+| `scripts/check_core_module_deps.py` | 解析 CMake 链接关系，检测新增依赖环 |
+| **`core_msg`** | `MsgIntf.cpp` / `MsgImpl.cpp` 编入独立库；去掉 `ApplicationSpecialPath` / 无用 `PluginImpl` 依赖 |
+
+### Phase 3 下一步
+
+1. ~~**拆 `core_msg`**~~ ✅
+2. **拆 `core_event`** — `EventIntf` / `EventImpl`（依赖 Window/environ，工作量大）
+3. **拆 `core_sysinit` / `core_script`** — 按文档表逐步迁出
+4. **CMake 去环** — `base` 去掉对 visual/sound/environ 的 PRIVATE 链接
+5. **CI 接入** — 在 CI 中运行 `check_core_module_deps.py`
 
 ---
 
@@ -550,6 +563,7 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 |------|------|------|
 | `core_io` | `cpp/core/io/` | `IFileBackend`、`StdFileBackend`、`tTVPLocalFileStream` |
 | `archive_xp3` | `cpp/core/archive/xp3/` | `XP3Archive.cpp/h` 从 `base` 迁出 |
+| `core_msg` | `cpp/core/msg/` | 消息字符串、`TVPFormatMessage`、版本信息（头文件仍在 `base/`） |
 | `core_storage_tool` | `cpp/core/storage/tool/` | 工具链专用存储层 + 运行时桩（原 `storage_min`） |
 | `archive_zip` | `cpp/core/archive/zip/` | ZIP 归档 |
 | `archive_7z` | `cpp/core/archive/7z/` | 7z 归档 |

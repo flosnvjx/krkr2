@@ -9,8 +9,8 @@
 // Definition of Messages and Message Related Utilities
 //---------------------------------------------------------------------------
 #include "tjsCommHead.h"
-#include "ApplicationSpecialPath.h"
 #include "tjsError.h"
+#include "DebugIntf.h"
 //---------------------------------------------------------------------------
 // import message strings
 //---------------------------------------------------------------------------
@@ -22,7 +22,6 @@
     tTJSMessageHolder name(TJS_W(#name), nullptr, false);
 
 #include "MsgIntf.h"
-#include "DebugIntf.h"
 
 //---------------------------------------------------------------------------
 // TVPFormatMessage
@@ -164,11 +163,9 @@ ttstr TVPGetVersionInformation() {
     ttstr tjsverstr{ fmt::format("{}.{}.{}", TJSVersionMajor, TJSVersionMinor,
                                  TJSVersionRelease) };
 
-    ttstr version = TVPFormatMessage(TVPVersionInformation, verstr, tjsverstr);
-    ttstr str = ApplicationSpecialPath::ReplaceStringAll(
-        version.AsStdString(), TJS_W("%DATE%"), ttstr(TVPCompileDate));
-    str = ApplicationSpecialPath::ReplaceStringAll(str, TJS_W("%TIME%"),
-                                                   ttstr(TVPCompileTime));
+    ttstr str = TVPFormatMessage(TVPVersionInformation, verstr, tjsverstr);
+    str.Replace(TJS_W("%DATE%"), ttstr(TVPCompileDate));
+    str.Replace(TJS_W("%TIME%"), ttstr(TVPCompileTime));
     return str;
 }
 

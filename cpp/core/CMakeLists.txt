@@ -7,6 +7,7 @@ add_library(${PROJECT_NAME} INTERFACE)
 
 add_subdirectory(tjs2)
 add_subdirectory(io)
+add_subdirectory(msg)
 add_subdirectory(archive)
 add_subdirectory(storage)
 add_subdirectory(base)

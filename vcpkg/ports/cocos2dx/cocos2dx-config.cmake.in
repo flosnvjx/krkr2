@@ -93,10 +93,10 @@ if(@LINUX@)
     find_dependency(unofficial-sqlite3)
 endif()
 
-if (ANDROID)
+if(@ANDROID@)
     find_dependency(Ogg CONFIG)
     find_dependency(Vorbis CONFIG)
-endif ()
+endif()
 
 # Windows-specific
 if(@WINDOWS@)

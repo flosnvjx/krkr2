@@ -143,6 +143,13 @@ install(
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+foreach(_plat IOS ANDROID WINDOWS MACOSX LINUX)
+    if(${_plat})
+        set(${_plat} ON)
+    else()
+        set(${_plat} OFF)
+    endif()
+endforeach()
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(

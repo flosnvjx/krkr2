@@ -10,6 +10,7 @@ set(CORE_STORAGE_SOURCE_FILES
     ${BASE_PATH}/UtilStreams.cpp
     ${STORAGE_PATH}/impl/ArchiveRegistry.cpp
     ${STORAGE_PATH}/impl/ArchiveFilename.cpp
+    ${STORAGE_PATH}/impl/ArchiveStream.cpp
     ${STORAGE_PATH}/ToolStorageInit.cpp
 )
 
@@ -23,7 +24,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${UTILS_PATH}
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 core_io archive_xp3)
+target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 core_io core_msg archive_xp3)
 
 find_package(unrar CONFIG REQUIRED)
 find_package(LibArchive REQUIRED)

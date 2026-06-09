@@ -11,7 +11,6 @@ set(BASE_SOURCE_FILES
     ${BASE_PATH}/SystemIntf.cpp
     ${BASE_PATH}/TextStream.cpp
     ${BASE_PATH}/KAGParser.cpp
-    ${BASE_PATH}/MsgIntf.cpp
 
     ${BASE_PATH}/impl/EventImpl.cpp
     ${BASE_PATH}/impl/FileSelector.cpp
@@ -23,7 +22,6 @@ set(BASE_SOURCE_FILES
     ${BASE_PATH}/impl/EngineArchiveInit.cpp
     ${BASE_PATH}/impl/SysInitImpl.cpp
     ${BASE_PATH}/impl/SystemImpl.cpp
-    ${BASE_PATH}/impl/MsgImpl.cpp
 )
 
 set(BASE_HEADERS_DIR
@@ -33,7 +31,7 @@ set(BASE_HEADERS_DIR
 
 add_library(${PROJECT_NAME} STATIC ${BASE_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${BASE_HEADERS_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 archive_xp3 archive_zip archive_7z archive_tar core_io core_storage PRIVATE core_visual_module core_plugin_module core_environ_module core_extension_module core_sound_module core_utils_module)
+target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 core_msg archive_xp3 archive_zip archive_7z archive_tar core_io core_storage PRIVATE core_visual_module core_plugin_module core_environ_module core_extension_module core_sound_module core_utils_module)
 
 find_package(uchardet CONFIG REQUIRED)
 find_package(unrar CONFIG REQUIRED)
