@@ -643,16 +643,17 @@ namespace motion {
                 // sdl3: emotenode::progress(tick) 就地递归，无子 Player
                 // 每帧全量 updateLayers。e-mote 仅在 clip/src
                 // 变化或首帧时步进子 Player。
-                const bool runChildStep = !emoteLike ||
+                const bool runChildStep = !emoteLike || _emoteDirty ||
                     (mn.flags & 0x01) != 0 || child._queuing ||
                     child._noUpdateYet;
-                if(runChildStep) {
-                    if(emoteLike) {
-                        child._clampedEvalTime = 0.0;
-                        child.frameProgress(0.0);
-                    } else {
-                        child.frameProgress(_frameLastTime);
-                    }
+                // libkrkr2.so label_18：子 Player 每帧
+                // frameProgress+updateLayers。
+                if(emoteLike) {
+                    child._clampedEvalTime = 0.0;
+                    child.frameProgress(0.0);
+                    child.updateLayers();
+                } else if(runChildStep) {
+                    child.frameProgress(_frameLastTime);
                     child.updateLayers();
                 }
             }

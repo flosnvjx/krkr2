@@ -26,10 +26,16 @@ namespace motion {
 
         updateLayersPhase1_PreLoop(currentTime);
         updateLayersPhase2_MainLoop(currentTime);
+        // e-mote 须与全量 Phase3 一致地计算顶点/形状，否则 prepare 的
+        // corners/paintBox 无效，child merge（Phase 2）在画面上无变化。
+        updateLayersPhase3_CameraConstraint();
+        updateLayersPhase3_VertexComputation();
         updateLayersPhase3_Visibility();
-        // sdl3 无 libkrkr2 子 Player 全量 updateLayers；嵌套 motion 仅在 src
-        // 变化时步进。
+        updateLayersPhase3_CameraNode();
+        updateLayersPhase3_ShapeAABB();
+        updateLayersPhase3_ShapeGeometry();
         updateLayersPhase3_MotionSubNode(currentTime);
+        logEmoteFirstEvalDiagnosticsOnce();
 
         _noUpdateYet = false;
         _queuing = false;

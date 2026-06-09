@@ -347,43 +347,13 @@ namespace motion {
                 _renderItemInheritedFlag18 || nodePriorDraw;
             const auto savedChildDrawAffine = child->_runtime->drawAffineMatrix;
             child->_runtime->drawAffineMatrix = dam;
-            // Never call child->prepareRenderItems here: it re-sorts/composites
-            // at every nesting level (O(N^depth) on NEKOPARA face_parts).
-            // Root prepareRenderItems sorts once after all merges.
             child->_runtime->preparedRenderItems.clear();
             child->appendPreparedRenderItems();
             child->_runtime->drawAffineMatrix = savedChildDrawAffine;
             auto &childEntries = child->_runtime->preparedRenderItems;
-            if(detail::logoSnapshotMarkEnabledForPath(motionPath) &&
-               motionPath.find("m2logo.mtn") != std::string::npos &&
-               _clampedEvalTime >= 30.0 && _clampedEvalTime <= 50.0) {
-                const auto *activeClip = child->selectActiveClip();
-                std::fprintf(
-                    stderr,
-                    "SNAPCHILD phase=prepare frame=%.3f childActiveMotion=%s "
-                    "childMotionKey=%s childClip=%s childNodesBuilt=%d "
-                    "childNodeCount=%zu childPreparedItemCount=%zu "
-                    "firstSource=%s\n",
-                    _clampedEvalTime,
-                    child->_runtime->activeMotion
-                        ? child->_runtime->activeMotion->path.c_str()
-                        : "<none>",
-                    detail::narrow(child->getMotion()).c_str(),
-                    activeClip ? activeClip->label.c_str() : "<none>",
-                    child->_runtime->nodes.size() > 1 ? 1 : 0,
-                    child->_runtime->nodes.size(), childEntries.size(),
-                    childEntries.empty() ||
-                            childEntries.front().sourceKey.empty()
-                        ? "<none>"
-                        : childEntries.front().sourceKey.c_str());
-            }
             if(childEntries.empty()) {
                 return;
             }
-            // Android sub_6D4F00 only stable-sorts by item+64. For equal
-            // sort keys, the pre-sort generation order is observable. Keep
-            // child-player output at the current node position instead of
-            // batching every child list at the front of the parent list.
             entries.insert(entries.end(),
                            std::make_move_iterator(childEntries.begin()),
                            std::make_move_iterator(childEntries.end()));
