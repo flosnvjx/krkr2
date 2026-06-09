@@ -1,9 +1,9 @@
 #include "MobileFileBackend.h"
 
 //---------------------------------------------------------------------------
-std::unique_ptr<tTJSBinaryStream> MobileFileBackend::Open(const ttstr &storageName,
-                                                          const ttstr &localName,
-                                                          tjs_uint32 flags) {
+std::unique_ptr<tTJSBinaryStream>
+MobileFileBackend::Open(const ttstr &storageName, const ttstr &localName,
+                        tjs_uint32 flags) {
     if((flags & TJS_BS_ACCESS_MASK) == TJS_BS_READ) {
         if(auto stream = Cocos.Open(storageName, localName, flags))
             return stream;
@@ -12,7 +12,8 @@ std::unique_ptr<tTJSBinaryStream> MobileFileBackend::Open(const ttstr &storageNa
 }
 
 //---------------------------------------------------------------------------
-std::unique_ptr<tTJSBinaryStream> MobileFileBackend::OpenRead(const ttstr &path) {
+std::unique_ptr<tTJSBinaryStream>
+MobileFileBackend::OpenRead(const ttstr &path) {
     if(auto stream = Cocos.OpenRead(path))
         return stream;
     return Local.OpenRead(path);

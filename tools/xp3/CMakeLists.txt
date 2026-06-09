@@ -11,7 +11,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE argparse::argparse)
 target_link_libraries(${PROJECT_NAME} PRIVATE
     tjs2
     core_io
-    core_storage_min
+    core_storage_tool
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     PROGRAM_NAME="${PROJECT_NAME}"

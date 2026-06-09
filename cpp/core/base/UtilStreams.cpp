@@ -15,10 +15,12 @@
 #include "DebugIntf.h"
 #include "EventIntf.h"
 #include "StorageIntf.h"
+#include <ctime>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include "Platform.h"
+
+extern bool TVP_utime(const char *name, time_t modtime);
 
 //---------------------------------------------------------------------------
 // tTVPLocalTempStorageHolder

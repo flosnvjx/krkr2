@@ -266,7 +266,7 @@ target_link_libraries(xp3 PRIVATE
     tjs2
     core_io          # BinaryStream
     archive_xp3      # 仅 XP3
-    core_storage_min # TVPOpenArchive + 本地文件 backend
+    core_storage_tool # TVPOpenArchive + 本地文件 backend
 )
 # 不链接: visual, sound, movie, environ, cocos2dx
 ```
@@ -386,7 +386,7 @@ target_link_libraries(krkr2core INTERFACE
 ### 方案 A：最小链接（推荐，改动适中）
 
 - 沿用现有 `TVPOpenArchive` API
-- 新建 `core_io` + `archive_xp3` + `core_storage_min`
+- 新建 `core_io` + `archive_xp3` + `core_storage_tool`
 - xp3 工具几乎不用改代码，只改 CMake
 - **优点**：与引擎行为一致，filter 兼容
 - **缺点**：仍依赖 tjs2 部分基础设施
@@ -493,7 +493,38 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 
 ---
 
-## 10. Phase 2 第一步进展（2026-06-09）
+## 10. 阶段进度总览（2026-06-09）
+
+| 阶段 | 状态 | 内容 |
+|------|------|------|
+| Phase 1 | ✅ 完成 | `core_io`、`archive_xp3`、`core_storage_tool`、xp3 轻量链接 |
+| Phase 2 | 🔄 进行中 | IFileBackend、归档注册、`core_storage`、去 base 反向依赖 |
+| Phase 3 | ⏳ 待做 | 拆 `core_base` → event/msg/sysinit/script |
+| Phase 4 | ⏳ 待做 | CMake 去环、environ 组合根 |
+| Phase 5 | ⏳ 可选 | `krkr2core` 接口库细化 |
+
+### Phase 2 已完成
+
+- `StorageImpl` 去掉 `cocos/cocos2d.h`
+- `IFileBackend` + `LocalFileBackend` / `MobileFileBackend` / `StdFileBackend`
+- `EnvironFileBackendInit`；移动端 Cocos 条件编译
+- 移除 `ChainedFileBackend`
+- `StorageImpl` 去掉无用 `WindowImpl.h`
+- `ArchiveRegistry`：归档 creator 注册表（引擎 ZIP/7z/TAR/XP3；工具仅 XP3）
+- **`core_storage` 库** — `StorageIntf`、`UtilStreams`、`ArchiveRegistry`、`TVPInitToolStorage()`；`base` 链 `core_storage`，引擎归档由 `TVPInitEngineArchiveCreators()` 注册
+- **`archive_zip`** — `ZIPArchive.cpp` 迁至 `cpp/core/archive/zip/`
+- **`core_storage_tool`** — 原 `storage_min` 迁至 `cpp/core/storage/tool/`，xp3 改链
+
+### Phase 2 下一步（建议顺序）
+
+1. ~~**抽出 `core_storage` 库**~~ ✅ — 见 `cpp/core/storage/`；`LocalFileBackend` 仍留 `base`（依赖 `tTVPLocalFileStream`）
+2. **拆 `archive_zip` / `archive_7z` / `archive_tar`** — `archive_zip` ✅；7z/TAR 待拆
+3. ~~**吸收 `core_storage_min`**~~ ✅ — 迁至 `cpp/core/storage/tool/`（`core_storage_tool`）；xp3 已改链；完整 `core_storage` 待 `TVPCreateStream` 拆分后
+4. **CI 模块依赖图** — 禁止新增环
+
+---
+
+## 11. Phase 2 第一步进展（2026-06-09）
 
 已完成：
 
@@ -511,7 +542,7 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 
 ---
 
-## 11. Phase 1 落地进展（2026-06-09）
+## 12. Phase 1 落地进展（2026-06-09）
 
 已完成的改动：
 
@@ -519,8 +550,9 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 |------|------|------|
 | `core_io` | `cpp/core/io/` | `IFileBackend`、`StdFileBackend`、`tTVPLocalFileStream` |
 | `archive_xp3` | `cpp/core/archive/xp3/` | `XP3Archive.cpp/h` 从 `base` 迁出 |
-| `core_storage_min` | `cpp/core/storage_min/` | 工具链专用最小存储层 + 运行时桩 |
-| `xp3` 工具 | `tools/xp3/CMakeLists.txt` | 链接 `tjs2 + core_io + core_storage_min`，不再链接 `core_base_module` |
+| `core_storage_tool` | `cpp/core/storage/tool/` | 工具链专用存储层 + 运行时桩（原 `storage_min`） |
+| `archive_zip` | `cpp/core/archive/zip/` | ZIP 归档（从 `base` 迁出） |
+| `xp3` 工具 | `tools/xp3/CMakeLists.txt` | 链接 `tjs2 + core_io + core_storage_tool`，不再链接 `core_base_module` |
 
 `core_base_module` 改为 `PUBLIC` 链接 `archive_xp3`，主程序行为不变。
 
@@ -531,7 +563,7 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 
 ---
 
-## 12. 相关文件索引
+## 13. 相关文件索引
 
 | 路径 | 说明 |
 |------|------|
@@ -539,7 +571,8 @@ TVPRegisterArchiveCreator(tTVPXP3Archive::Create);
 | `tools/xp3/CMakeLists.txt` | 当前链接 core_base_module |
 | `cpp/core/base/CMakeLists.txt` | base 模块依赖定义 |
 | `cpp/core/base/XP3Archive.cpp` | XP3 归档实现 |
-| `cpp/core/base/StorageIntf.h` | 存储/VFS 抽象接口 |
+| `cpp/core/storage/` | `core_storage`：`StorageIntf`、`UtilStreams`、`ArchiveRegistry`、`ToolStorageInit` |
+| `cpp/core/base/StorageIntf.h` | 存储/VFS 抽象接口（实现已编入 `core_storage`） |
 | `cpp/core/base/impl/StorageImpl.cpp` | 存储实现（含 cocos 耦合） |
 | `cpp/core/CMakeLists.txt` | krkr2core 聚合目标 |
 | `cpp/plugins/xp3filter.cpp` | XP3 解密/过滤插件 |

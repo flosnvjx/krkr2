@@ -20,7 +20,6 @@
 #include "TVPPlatform.h"
 
 #include "StorageImpl.h"
-#include "WindowImpl.h"
 #include "SysInitIntf.h"
 #include "DebugIntf.h"
 #include "Random.h"
@@ -558,37 +557,6 @@ bool TVPCheckExistentLocalFolder(const ttstr &name) {
     return s.st_mode & S_IFDIR;
 }
 //---------------------------------------------------------------------------
-
-tTVPArchive *TVPOpenZIPArchive(const ttstr &name, tTJSBinaryStream *st,
-                               bool normalizeFileName);
-
-tTVPArchive *TVPOpen7ZArchive(const ttstr &name, tTJSBinaryStream *st,
-                              bool normalizeFileName);
-
-tTVPArchive *TVPOpenTARArchive(const ttstr &name, tTJSBinaryStream *st,
-                               bool normalizeFileName);
-
-static tTVPArchive *(*ArchiveCreators[])(
-    const ttstr &name, tTJSBinaryStream *st,
-    bool normalizeFileName) = { TVPOpenZIPArchive, TVPOpen7ZArchive,
-                                TVPOpenTARArchive, tTVPXP3Archive::Create };
-
-//---------------------------------------------------------------------------
-// TVPOpenArchive
-//---------------------------------------------------------------------------
-tTVPArchive *TVPOpenArchive(const ttstr &name, bool normalizeFileName) {
-    tTJSBinaryStream *st = TVPCreateStream(name);
-    if(!st)
-        return nullptr;
-    for(auto creator : ArchiveCreators) {
-        tTVPArchive *archive = creator(name, st, normalizeFileName);
-        if(archive)
-            return archive;
-        st->SetPosition(0);
-    }
-    delete st;
-    return nullptr;
-}
 
 //---------------------------------------------------------------------------
 int TVPCheckArchive(const ttstr &localname) {

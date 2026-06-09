@@ -14,9 +14,9 @@ std::string CocosFileBackend::ResolvePath(const ttstr &path) {
 }
 
 //---------------------------------------------------------------------------
-std::unique_ptr<tTJSBinaryStream> CocosFileBackend::Open(const ttstr &storageName,
-                                                         const ttstr &localName,
-                                                         tjs_uint32 flags) {
+std::unique_ptr<tTJSBinaryStream>
+CocosFileBackend::Open(const ttstr &storageName, const ttstr &localName,
+                       tjs_uint32 flags) {
     if((flags & TJS_BS_ACCESS_MASK) != TJS_BS_READ)
         return nullptr;
     const ttstr &path = localName.IsEmpty() ? storageName : localName;
@@ -24,7 +24,8 @@ std::unique_ptr<tTJSBinaryStream> CocosFileBackend::Open(const ttstr &storageNam
 }
 
 //---------------------------------------------------------------------------
-std::unique_ptr<tTJSBinaryStream> CocosFileBackend::OpenRead(const ttstr &path) {
+std::unique_ptr<tTJSBinaryStream>
+CocosFileBackend::OpenRead(const ttstr &path) {
     auto *fileUtils = cocos2d::FileUtils::getInstance();
     const std::string resolved = ResolvePath(path);
     if(!fileUtils->isFileExist(resolved))
@@ -44,4 +45,3 @@ std::unique_ptr<tTJSBinaryStream> CocosFileBackend::OpenRead(const ttstr &path) 
 bool CocosFileBackend::Exists(const ttstr &path) {
     return cocos2d::FileUtils::getInstance()->isFileExist(ResolvePath(path));
 }
-

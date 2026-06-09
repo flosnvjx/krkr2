@@ -11,8 +11,7 @@ tTVPArchive *TVPOpenArchive(const ttstr &name, bool normalizeFileName) {
     if(!st)
         return nullptr;
 
-    tTVPArchive *archive =
-        tTVPXP3Archive::Create(name, st, normalizeFileName);
+    tTVPArchive *archive = tTVPXP3Archive::Create(name, st, normalizeFileName);
     if(archive)
         return archive;
 

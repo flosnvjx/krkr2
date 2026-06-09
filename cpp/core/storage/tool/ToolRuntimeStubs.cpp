@@ -22,7 +22,7 @@ void TVPAddCompactEventHook(tTVPCompactEventCallbackIntf *) {}
 // 工具进程退出后由 OS 回收资源即可。若在静态析构阶段调用 XP3 的 AtExit
 // 清理（TVPShutdownArchiveHandleCache），可能与 tTJSCriticalSection 的
 // 析构顺序冲突，导致 mutex lock failed。
-void TVPAddAtExitHandler(tjs_int /*pri*/, void (/*handler*/)) {}
+void TVPAddAtExitHandler(tjs_int /*pri*/, void(/*handler*/)) {}
 
 //---------------------------------------------------------------------------
 ttstr TVPGetMessageByLocale(const std::string &key) {

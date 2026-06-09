@@ -30,6 +30,7 @@
 #include <thread>
 #include "ConfigManager/LocaleConfigManager.h"
 #include "StorageIntf.h"
+#include "EngineArchiveInit.h"
 #include "EnvironFileBackendInit.h"
 extern "C" {
 #include <libavutil/avstring.h>
@@ -326,6 +327,7 @@ bool tTVPApplication::StartApplication(ttstr path) {
 
         // TVPInitializeBaseSystems
         TVPInitEnvironFileBackends();
+        TVPInitEngineArchiveCreators();
         TVPInitializeBaseSystems();
 
         Initialize();
