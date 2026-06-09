@@ -5,22 +5,20 @@
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
 #else
-
 #include <AL/alc.h>
 #include <AL/alext.h>
-
 #endif
+
 #ifdef __ANDROID__
-
 #include "oboe/Oboe.h"
-
 #endif
 
 #include "DebugIntf.h"
 #include "SysInitIntf.h"
 #include "TickCount.h"
 #include "WaveImpl.h"
-#include <SDL2/SDL.h>
+#include "WaveMixerConverter.h"
+
 #include <algorithm>
 #include <assert.h>
 #include <iomanip>
@@ -32,6 +30,30 @@
 class iTVPAudioRenderer;
 
 static iTVPAudioRenderer *TVPAudioRenderer;
+
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+static float readFloatLE(const float &f) {
+    uint32_t u;
+    memcpy(&u, &f, sizeof(u));
+    u = ((u & 0xFF000000u) >> 24) | ((u & 0x00FF0000u) >> 8) |
+        ((u & 0x0000FF00u) << 8) | ((u & 0x000000FFu) << 24);
+    float r;
+    memcpy(&r, &u, sizeof(r));
+    return r;
+}
+
+static void writeFloatLE(float *dst, float v) {
+    uint32_t u;
+    memcpy(&u, &v, sizeof(u));
+    u = ((u & 0xFF000000u) >> 24) | ((u & 0x00FF0000u) >> 8) |
+        ((u & 0x0000FF00u) << 8) | ((u & 0x000000FFu) << 24);
+    memcpy(dst, &u, sizeof(u));
+}
+#else
+static float readFloatLE(const float &f) { return f; }
+
+static void writeFloatLE(float *dst, float v) { *dst = v; }
+#endif
 
 template <int ch>
 void MixAudioS16CPP(void *dst, const void *src, int samples, int16_t *volume) {
@@ -66,8 +88,8 @@ void MixAudioF32CPP(void *dst, const void *src, int samples, int16_t *volume) {
         fvolume[i] = volume[i] * fmaxvolume;
     while(samples--) {
         for(int i = 0; i < ch; ++i) {
-            float src_sample = SDL_SwapFloatLE(*src32++) * fvolume[i];
-            float dest_sample = SDL_SwapFloatLE(*dst32);
+            float src_sample = readFloatLE(*src32++) * fvolume[i];
+            float dest_sample = readFloatLE(*dst32);
             if(src_sample > 0 && dest_sample > 0) {
                 dest_sample =
                     src_sample + dest_sample - dest_sample * src_sample;
@@ -77,7 +99,7 @@ void MixAudioF32CPP(void *dst, const void *src, int samples, int16_t *volume) {
             } else {
                 dest_sample += src_sample;
             }
-            *(dst32++) = SDL_SwapFloatLE(dest_sample);
+            writeFloatLE(dst32++, dest_sample);
         }
     }
 }
@@ -105,8 +127,8 @@ public:
     float _pan = 0;
     const signed int MAX_VOLUME = 16384; // limit in signed 16bit
     int16_t _volume_raw[8];
-    SDL_AudioCVT *_cvt = nullptr;
-    std::vector<uint8_t> _cvtbuf;
+    ITVPAudioConverter *_cvt = nullptr;
+    int _buffer_frame_size = 0;
     int _frame_size = 0;
 
     void RecalcVolume() {
@@ -129,15 +151,10 @@ public:
     tjs_uint _sendedFrontBuffer = 0;
     tjs_uint _sendedSamples = 0, _inCachedSamples = 0;
 
-    tTVPSoundBuffer(int framesize, SDL_AudioCVT *cvt) :
+    tTVPSoundBuffer(int framesize, ITVPAudioConverter *cvt) :
         _frame_size(framesize), _cvt(cvt) {
+        _buffer_frame_size = cvt ? cvt->dstFrameSize() : framesize;
         RecalcVolume();
-        if(cvt) {
-            _cvtbuf.resize(
-                /*2352*/ 2400 * 2 * 4 *
-                _cvt->len_mult); // IEEE f.32 stereo 48000kHz
-            _cvt->buf = &_cvtbuf.front();
-        }
     }
 
     ~tTVPSoundBuffer() override;
@@ -181,34 +198,16 @@ public:
                       unsigned int inlen /*, int tag = 0*/) override {
         if(_cvt) {
             std::vector<uint8_t> buffer;
-            uint8_t *inbuf = (uint8_t *)_inbuf;
-            int buflen = _frame_size * 2352;
-            _cvt->len = buflen;
-            while(inlen > buflen) { // fill 2352 samples to fit 48k/44.1k
-                memcpy(_cvt->buf, inbuf, buflen);
-                SDL_ConvertAudio(_cvt);
-                buffer.insert(buffer.end(), _cvt->buf,
-                              _cvt->buf + _cvt->len_cvt);
-                inlen -= buflen;
-                inbuf += buflen;
-            }
-            if(inlen > 0) {
-                int buflen = inlen;
-                memcpy(_cvt->buf, inbuf, buflen);
-                _cvt->len = buflen;
-                SDL_ConvertAudio(_cvt);
-                buffer.insert(buffer.end(), _cvt->buf,
-                              _cvt->buf + _cvt->len_cvt);
-            }
+            _cvt->convert(_inbuf, inlen, buffer);
             std::lock_guard<std::mutex> lk(_buffer_mtx);
-            _inCachedSamples += buffer.size() / _frame_size;
+            _inCachedSamples += buffer.size() / _buffer_frame_size;
             _buffers.emplace_back();
             _buffers.back().swap(buffer);
         } else {
             std::lock_guard<std::mutex> lk(_buffer_mtx);
             _buffers.emplace_back((uint8_t *)_inbuf,
                                   ((uint8_t *)_inbuf) + inlen);
-            _inCachedSamples += inlen / _frame_size;
+            _inCachedSamples += inlen / _buffer_frame_size;
         }
     }
 
@@ -234,39 +233,31 @@ public:
 
 class iTVPAudioRenderer {
 protected:
-    SDL_AudioSpec _spec;
+    TVPAudioSpec _spec;
     std::mutex _streams_mtx;
     std::unordered_set<tTVPSoundBuffer *> _streams;
     int _frame_size = 0;
 
 public:
     iTVPAudioRenderer() {
-        memset(&_spec, 0, sizeof(_spec));
         _spec.freq = 48000;
-        _spec.format = AUDIO_S16;
+        _spec.format = TVPAudioSampleFormat::S16;
         _spec.channels = 2;
-        _spec.callback = [](void *p, Uint8 *s, int l) {
-            memset(s, 0, l);
-            ((iTVPAudioRenderer *)p)->FillBuffer(s, l);
-        };
-        _spec.userdata = this;
-        _spec.size = 4;
-        _frame_size = 4;
+        _spec.frame_size =
+            TVPAudioSpec::calcFrameSize(_spec.format, _spec.channels);
+        _frame_size = _spec.frame_size;
     }
 
-    void InitMixer() {
-        if(SDL_Init(SDL_INIT_AUDIO) < 0) { // for format converter
-            SDL_Log("Fail to initialize audio.");
-            return;
-        }
-    }
+    virtual ~iTVPAudioRenderer() = default;
 
-    FAudioMix *DoMixAudio;
+    void InitMixer() {}
+
+    FAudioMix *DoMixAudio{};
 
     void SetupMixer() {
-        if(_spec.format == AUDIO_S16LSB) {
+        if(_spec.format == TVPAudioSampleFormat::S16) {
             DoMixAudio = _AudioMixS16[_spec.channels - 1];
-        } else if(_spec.format == AUDIO_F32LSB) {
+        } else if(_spec.format == TVPAudioSampleFormat::F32) {
             DoMixAudio = _AudioMixF32[_spec.channels - 1];
         } else {
             DoMixAudio = [](void *dst, const void *src, int samples,
@@ -277,36 +268,19 @@ public:
     virtual bool Init() = 0;
 
     virtual tTVPSoundBuffer *CreateStream(tTVPWaveFormat &fmt, int bufcount) {
-        SDL_AudioSpec spec;
-        memset(&spec, 0, sizeof(spec));
-        spec.freq = fmt.SamplesPerSec;
-        spec.channels = fmt.Channels;
-        if(fmt.IsFloat) {
-            spec.format = AUDIO_F32LSB;
-        } else {
-            switch(fmt.BitsPerSample) {
-                case 8:
-                    spec.format = AUDIO_S8;
-                    break;
-                case 16:
-                    spec.format = AUDIO_S16LSB;
-                    break;
-                case 32:
-                    spec.format = AUDIO_S32LSB;
-                    break;
-                default:
-                    return nullptr;
-            }
+        (void)bufcount;
+        TVPAudioSampleFormat srcFormat = waveFormatToSampleFormat(fmt);
+        if(srcFormat == TVPAudioSampleFormat::Unknown) {
+            return nullptr;
         }
-        SDL_AudioCVT *cvt = nullptr;
-        if(spec.freq != _spec.freq || spec.channels != _spec.channels ||
-           spec.format != _spec.format) {
-            cvt = new SDL_AudioCVT;
-            int err =
-                SDL_BuildAudioCVT(cvt, spec.format, spec.channels, spec.freq,
-                                  _spec.format, _spec.channels, _spec.freq);
-            if(err != 1) {
-                delete cvt;
+
+        ITVPAudioConverter *cvt = nullptr;
+        if(fmt.SamplesPerSec != _spec.freq || fmt.Channels != _spec.channels ||
+           srcFormat != _spec.format) {
+            cvt = CreateTVPAudioConverter(srcFormat, fmt.Channels,
+                                          fmt.SamplesPerSec, _spec.format,
+                                          _spec.channels, _spec.freq);
+            if(!cvt) {
                 return nullptr;
             }
         }
@@ -323,7 +297,7 @@ public:
         _streams.erase(s);
     }
 
-    void FillBuffer(Uint8 *buf, int len) {
+    void FillBuffer(uint8_t *buf, int len) {
         // memset(buf, 0, len);
         std::lock_guard<std::mutex> lk(_streams_mtx);
         for(tTVPSoundBuffer *s : _streams) {
@@ -337,16 +311,15 @@ public:
         return samples;
     }
 
-    const SDL_AudioSpec &GetSpec() { return _spec; }
+    const TVPAudioSpec &GetSpec() const { return _spec; }
 
     virtual int32_t GetUnprocessedSamples() { return 0; }
 };
 
 tTVPSoundBuffer::~tTVPSoundBuffer() {
-    Stop();
+    tTVPSoundBuffer::Stop();
     TVPAudioRenderer->ReleaseStream(this);
-    if(_cvt)
-        delete _cvt;
+    DestroyTVPAudioConverter(_cvt);
 }
 
 tjs_uint tTVPSoundBuffer::GetLatencySamples() {
@@ -362,7 +335,8 @@ tjs_uint tTVPSoundBuffer::GetCurrentPlaySamples() {
 }
 
 float tTVPSoundBuffer::GetLatencySeconds() {
-    return GetLatencySamples() / TVPAudioRenderer->GetSpec().freq;
+    return GetLatencySamples() /
+        static_cast<float>(TVPAudioRenderer->GetSpec().freq);
 }
 
 void tTVPSoundBuffer::FillBuffer(uint8_t *out, int len) {
@@ -387,26 +361,6 @@ void tTVPSoundBuffer::FillBuffer(uint8_t *out, int len) {
         }
     }
 }
-
-class tTVPAudioRendererSDL : public iTVPAudioRenderer {
-    SDL_AudioDeviceID _playback_id;
-
-public:
-    bool Init() override {
-        InitMixer();
-        _playback_id = SDL_OpenAudioDevice(nullptr, false, &_spec, &_spec,
-                                           SDL_AUDIO_ALLOW_ANY_CHANGE);
-        if(_playback_id <= 0) {
-            SDL_Log("Fail to open audio @%dHz.", _spec.freq);
-            return false;
-        }
-        _frame_size = SDL_AUDIO_BITSIZE(_spec.format) / 8 * _spec.channels;
-        SDL_Log("Audio Device: %s", SDL_GetCurrentAudioDriver());
-        SDL_PauseAudioDevice(_playback_id, false);
-        SetupMixer();
-        return true;
-    }
-};
 
 #ifdef __ANDROID__
 
@@ -441,26 +395,31 @@ public:
             _spec.freq = _oboeAudioStream->getSampleRate();
             switch(_oboeAudioStream->getFormat()) {
                 case oboe::AudioFormat::I16:
-                    _spec.format = AUDIO_S16LSB;
+                    _spec.format = TVPAudioSampleFormat::S16;
                     break;
                 case oboe::AudioFormat::Float:
-                    _spec.format = AUDIO_F32LSB;
+                    _spec.format = TVPAudioSampleFormat::F32;
+                    break;
+                default:
+                    _spec.format = TVPAudioSampleFormat::S16;
                     break;
             }
-            _frame_size = SDL_AUDIO_BITSIZE(_spec.format) / 8 * _spec.channels;
+            _spec.frame_size =
+                TVPAudioSpec::calcFrameSize(_spec.format, _spec.channels);
+            _frame_size = _spec.frame_size;
             _oboeAudioStream->requestStart();
-            SDL_Log("Audio Device: Oboe @%dHz", _spec.freq);
+            waveMixerAudioLogf("Audio Device: Oboe @%uHz", _spec.freq);
             SetupMixer();
             return true;
         }
-        SDL_Log("Fail to open Oboe audio");
-        // SetupSDL();
+        waveMixerAudioLogf("Fail to open Oboe audio");
         return false;
     }
 
     virtual oboe::DataCallbackResult onAudioReady(oboe::AudioStream *oboeStream,
                                                   void *audioData,
                                                   int32_t numFrames) override {
+        (void)oboeStream;
         int len = _frame_size * numFrames;
         memset(audioData, 0, _frame_size * numFrames);
         // if (oboeStream == _oboeAudioStream)
@@ -705,7 +664,7 @@ class tTVPAudioRendererAL : public iTVPAudioRenderer {
     ALCcontext *_context = nullptr;
 
 public:
-    virtual ~tTVPAudioRendererAL() {
+    ~tTVPAudioRendererAL() override {
         if(_context) {
             // alDeleteSources(TVP_MAX_AUDIO_COUNT, _alSources);
             alcMakeContextCurrent(nullptr);
@@ -762,7 +721,7 @@ void tTVPSoundBufferAL::checkerr(const char *funcname) {
     ALenum err = alGetError();
     if(AL_NO_ERROR == err)
         return;
-    SDL_Log("%s OpenAL Error %X", funcname, err);
+    waveMixerAudioLogf("%s OpenAL Error %X", funcname, err);
 #endif
 }
 
@@ -773,10 +732,6 @@ static iTVPAudioRenderer *CreateAudioRenderer() {
     if(renderer->Init())
         return renderer;
     delete renderer;
-#elif defined(_MSC_VER) && 0
-    renderer = new tTVPAudioRendererSDL;
-    renderer->Init();
-    return renderer;
 #endif
     renderer = new tTVPAudioRendererAL;
     renderer->Init();
@@ -784,6 +739,7 @@ static iTVPAudioRenderer *CreateAudioRenderer() {
 }
 
 void TVPInitDirectSound(int freq) {
+    (void)freq;
     if(!TVPAudioRenderer) {
         TVPAudioRenderer = CreateAudioRenderer();
     }

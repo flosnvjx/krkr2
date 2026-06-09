@@ -15,8 +15,6 @@ static cocos2d::Size designResolutionSize(960, 640);
 
 extern std::thread::id TVPMainThreadID;
 
-extern "C" void SDL_SetMainReady();
-
 bool TVPCheckStartupArg();
 
 std::string TVPGetCurrentLanguage();
@@ -32,7 +30,6 @@ void TVPAppDelegate::applicationDidEnterBackground() {
 }
 
 bool TVPAppDelegate::applicationDidFinishLaunching() {
-    SDL_SetMainReady();
     TVPMainThreadID = std::this_thread::get_id();
     spdlog::debug("App Finish Launching");
     // initialize director

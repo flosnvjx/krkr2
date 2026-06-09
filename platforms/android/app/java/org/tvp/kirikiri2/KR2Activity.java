@@ -326,7 +326,6 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
 
-        //SDLActivity.mHasFocus = hasFocus;
         if (hasFocus) {
             hideSystemUI();
         }

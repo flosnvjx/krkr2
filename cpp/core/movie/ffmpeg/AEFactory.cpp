@@ -309,7 +309,6 @@ IAEStream *CAEFactory::MakeStream(AEAudioFormat &audioFormat,
     //   if(AE)
     //     return AE->MakeStream(audioFormat, options, clock);
     return new CAEStreamAL(audioFormat, options, clock);
-    return nullptr;
 }
 
 bool CAEFactory::FreeStream(IAEStream *stream) {

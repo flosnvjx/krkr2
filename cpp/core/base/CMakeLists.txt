@@ -44,7 +44,6 @@ find_package(LibXml2 REQUIRED)
 include_directories(${LIBXML2_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBXML2_LIBRARIES})
 find_package(LibArchive REQUIRED)
-find_package(SDL2 CONFIG REQUIRED)
 find_package(zstd CONFIG REQUIRED)
 find_package(cocos2dx CONFIG REQUIRED)
 
@@ -54,7 +53,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     LibArchive::LibArchive
     zstd::libzstd
 
-    $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
-    $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
     cocos2dx::cocos2d
 )

@@ -8,12 +8,15 @@
       "name": "argparse",
       "platform": "linux | windows | osx"
     },
+    {
+      "name": "blend2d",
+      "platform": "!windows"
+    },
     "boost-iostreams",
     {
       "name": "boost-locale",
       "default-features": false
     },
-    "bullet3",
     "boost-phoenix",
     "boost-spirit",
     {
@@ -21,6 +24,7 @@
       "default-features": false,
       "platform": "android"
     },
+    "bullet3",
     {
       "name": "catch2",
       "default-features": false,
@@ -40,10 +44,6 @@
     "glm",
     "jxrlib",
     "libarchive",
-    {
-      "name": "blend2d",
-      "platform": "!windows"
-    },
     "libjpeg-turbo",
     {
       "name": "libogg",
@@ -56,6 +56,10 @@
     "libvorbis",
     "libwebp",
     "lz4",
+    {
+      "name": "miniaudio",
+      "platform": "android"
+    },
     "oniguruma",
     "openal-soft",
     {
@@ -71,10 +75,6 @@
     },
     {
       "name": "opusfile",
-      "default-features": false
-    },
-    {
-      "name": "sdl2",
       "default-features": false
     },
     "spdlog",

@@ -120,7 +120,6 @@ android {
 
 dependencies {
     //implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation project(':sdl')
     implementation project(':cocos2dx')
 
     implementation 'com.google.oboe:oboe:1.9.3'

@@ -26,6 +26,7 @@ set(SOUND_SOURCE_FILES
 #    ${SOUND_PATH}/win32/tvpsnd.idl
     ${SOUND_PATH}/win32/WaveImpl.cpp
     ${SOUND_PATH}/win32/WaveMixer.cpp
+    ${SOUND_PATH}/win32/WaveMixerConverter.cpp
 )
 
 set(SOUND_HEADERS_DIR
@@ -43,6 +44,18 @@ find_package(OpusFile CONFIG REQUIRED)
 
 if(ANDROID)
     find_package(oboe CONFIG REQUIRED)
+
+    list(APPEND SOUND_SOURCE_FILES ${SOUND_PATH}/win32/WaveMixerMiniaudio.cpp)
+
+    find_path(MINIAUDIO_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${MINIAUDIO_INCLUDE_DIR})
+
+    set_source_files_properties(
+        ${SOUND_PATH}/win32/WaveMixerMiniaudio.cpp
+        PROPERTIES
+        COMPILE_DEFINITIONS
+        "MINIAUDIO_IMPLEMENTATION;MA_NO_DECODING;MA_NO_ENCODING;MA_NO_RESOURCE_MANAGER;MA_NO_NODE_GRAPH"
+    )
 
     target_link_libraries(${PROJECT_NAME} PRIVATE
         oboe::oboe

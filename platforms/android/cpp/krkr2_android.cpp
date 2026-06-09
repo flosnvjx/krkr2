@@ -1,7 +1,6 @@
-/* Include the SDL main definition header */
+/* Android JNI bridge for cocos2d-based KR2Activity */
 #include <memory>
 #include <jni.h>
-#include <dlfcn.h>
 #include <cocos/platform/android/jni/JniHelper.h>
 
 #include "environ/cocos2d/AppDelegate.h"
@@ -47,20 +46,6 @@ static bool DumpFilter(void *data) {
         spdlog::android_logger_mt("plugin", "KrKr2NativePlugin");
 
     spdlog::set_default_logger(core_logger);
-
-    JavaVM *vm{};
-    env->GetJavaVM(&vm);
-    void *handle = dlopen("libSDL2.so", RTLD_LAZY);
-    if(handle) {
-        typedef jint (*JNI_OnLoad)(JavaVM *, void *);
-        void *sdl2Init = dlsym(handle, "JNI_OnLoad");
-        if(!sdl2Init ||
-           ((JNI_OnLoad)sdl2Init)(vm, nullptr) != JNI_VERSION_1_4) {
-            spdlog::critical("invoke libSDL2.so JNI_OnLoad method failed");
-        }
-    } else {
-        spdlog::critical("load libSDL2.so failed");
-    }
 
     static std::unique_ptr<TVPAppDelegate> pAppDelegate =
         std::make_unique<TVPAppDelegate>();
