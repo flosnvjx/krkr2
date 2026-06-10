@@ -44,7 +44,7 @@ bool TVPAppDelegate::applicationDidFinishLaunching() {
             cocos2d::Rect(0, 0, designResolutionSize.width,
                           designResolutionSize.height));
 #else
-        glview = GLViewImpl::create("krkr2");
+        glview = cocos2d::GLViewImpl::create("krkr2");
 #endif
         director->setOpenGLView(glview);
 #if CC_TARGET_PLATFORM == CC_PLATFORM_WIN32

@@ -32,7 +32,7 @@ jobs:
           Expand-Archive -Path "$env:TEMP\winflexbison.zip" -DestinationPath "C:\winflexbison"
           echo "C:\winflexbison" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
           
-          choco install nasm python3 -y
+          choco install yasm python3 -y
 
       - name: Setup vcpkg
         run: |
