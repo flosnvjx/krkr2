@@ -34,6 +34,11 @@ set(SOUND_HEADERS_DIR
     ${SOUND_PATH}/win32
 )
 
+if(ANDROID)
+    find_package(oboe CONFIG REQUIRED)
+    list(APPEND SOUND_SOURCE_FILES ${SOUND_PATH}/win32/WaveMixerMiniaudio.cpp)
+endif()
+
 add_library(${PROJECT_NAME} STATIC ${SOUND_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${SOUND_HEADERS_DIR})
 target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 PRIVATE core_base_module core_movie_module core_utils_module core_environ_module)
@@ -43,10 +48,6 @@ find_package(Opus CONFIG REQUIRED)
 find_package(OpusFile CONFIG REQUIRED)
 
 if(ANDROID)
-    find_package(oboe CONFIG REQUIRED)
-
-    list(APPEND SOUND_SOURCE_FILES ${SOUND_PATH}/win32/WaveMixerMiniaudio.cpp)
-
     find_path(MINIAUDIO_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
     target_include_directories(${PROJECT_NAME} PRIVATE ${MINIAUDIO_INCLUDE_DIR})
 
