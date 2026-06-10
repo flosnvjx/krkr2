@@ -58,6 +58,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
   - [JDK@17](https://jdk.java.net/archive/)
   - `bison@3.8.2+`
   - `python3`
+  - `NASM@latest`
   - `YASM@latest`
 - **Windows**:
   - [ninja@latest](https://github.com/ninja-build/ninja/releases)
@@ -66,7 +67,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
   - [cmake@3.31.1+](https://cmake.org/download/)
   - [winflexbison@2.5.25](https://github.com/lexxmark/winflexbison)
   - `python3`
-  - `YASM@latest`
+  - `NASM@latest`
 - **Linux**:
   - [ninja@latest](https://github.com/ninja-build/ninja/releases)
   - `GCC`
@@ -74,6 +75,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
   - [cmake@3.31.1+](https://cmake.org/download/)
   - `bison@3.8.2+`
   - `python3`
+  - `NASM@latest`
   - `YASM@latest`
 - **MacOS**:
   - Xcode
@@ -82,6 +84,7 @@ It supports **Android, Windows, Linux, and MacOS**, allowing users to play KiriK
   - [cmake@3.31.1+](https://cmake.org/download/)
   - `bison@3.8.2+`
   - `python3`
+  - `NASM@latest`
   - `YASM@latest`
 
 ---

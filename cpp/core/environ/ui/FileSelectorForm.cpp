@@ -8,6 +8,7 @@
 #include "ui/UICheckBox.h"
 #include "Platform.h"
 #include "cocos2d/MainScene.h"
+#include "RenderUtils.h"
 #include "ConfigManager/LocaleConfigManager.h"
 #include "platform/CCFileUtils.h"
 #include "base/CCDirector.h"
@@ -455,8 +456,8 @@ ssize_t TVPBaseFileSelectorForm::numberOfCellsInTableView(TableView *table) {
     return CurrentDirList.empty() ? 0 : CurrentDirList.size() + 1;
 }
 
-Size TVPBaseFileSelectorForm::tableCellSizeForIndex(TableView *table,
-                                                    ssize_t idx) {
+cocos2d::Size TVPBaseFileSelectorForm::tableCellSizeForIndex(TableView *table,
+                                                             ssize_t idx) {
     if((size_t)idx >= CurrentDirList.size()) {
         return { table->getContentSize().width, 200 };
     }
@@ -859,7 +860,7 @@ void TVPListForm::initFromInfo(
     for(Widget *cell : cells) {
         height += cell->getContentSize().height;
     }
-    _root->setAnchorPoint(Size(0.5, 0.5));
+    _root->setAnchorPoint(cocos2d::Size(0.5, 0.5));
     _root->setPosition(sceneSize / 2);
     sceneSize.width *= 0.8f;
     sceneSize.height *= 0.8f;
@@ -894,7 +895,7 @@ void TVPListForm::show() {
 }
 
 bool TVPListForm::onMaskTouchBegan(cocos2d::Touch *t, cocos2d::Event *) {
-    Rect rc;
+    cocos2d::Rect rc;
     rc.size = getContentSize();
     if(rc.containsPoint(convertTouchToNodeSpace(t))) {
         TVPMainScene::GetInstance()->popUIForm(this,
@@ -908,10 +909,6 @@ TVPListForm::~TVPListForm() {
     if(_listform == this)
         _listform = nullptr;
 }
-
-int TVPDrawSceneOnce(int interval);
-
-void TVPProcessInputEvents();
 
 std::string TVPShowFileSelector(const std::string &title,
                                 const std::string &initfilename,
@@ -958,7 +955,7 @@ void TVPFileSelectorForm::initFromPath(const std::string &initfilename,
                                        bool issave) {
     _isSaveMode = issave;
     this->initFromFile(Csd::createNaviBar(),
-                       Csd::createTableView(Size(0, 0), 1),
+                       Csd::createTableView(cocos2d::Size(0, 0), 1),
                        Csd::createBottomBarTextInput());
     _input->setString(initfilename);
     ListDir(initdir); // getCurrentDir()
@@ -1022,7 +1019,7 @@ void TVPFileSelectorForm::close() {
 void TVPBaseFileSelectorForm::FileItemCellImpl::init(
     const Csd::NodeBuilderFn &nodeBuilderFn, float width) {
     TTouchEventRouter::init();
-    _root = nodeBuilderFn(Size(width, 48), 1);
+    _root = nodeBuilderFn(cocos2d::Size(width, 48), 1);
 
     this->addChild(_root);
     OrigCellModelSize = _root->getContentSize();

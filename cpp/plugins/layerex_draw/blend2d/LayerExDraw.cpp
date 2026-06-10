@@ -1550,7 +1550,7 @@ void LayerExDraw::updateViewTransform() {
  * 表示トランスフォームの指定
  * @param matrix トランスフォームマトリックス
  */
-void LayerExDraw::setViewTransform(const GdipMatrix *trans) {
+void LayerExDraw::setViewTransform(GdipMatrix *trans) {
     if(!viewTransform.equals(trans->_core)) {
         viewTransform.reset();
         viewTransform.transform(trans->_core);
@@ -1588,7 +1588,7 @@ void LayerExDraw::updateTransform() {
  * トランスフォームの指定
  * @param matrix トランスフォームマトリックス
  */
-void LayerExDraw::setTransform(const GdipMatrix *trans) {
+void LayerExDraw::setTransform(GdipMatrix *trans) {
     if(!transform.equals(trans->_core)) {
         transform.reset();
         transform.transform(trans->_core);
@@ -3054,11 +3054,7 @@ public:
     }
 
     // デストラクタ
-    ~GdipWrapper() {
-        if(obj) {
-            delete obj;
-        }
-    }
+    ~GdipWrapper() { delete obj; }
 
     GdipClassT *getGdipObject() { return obj; }
 
@@ -3094,26 +3090,29 @@ struct GdipTypeConvertor {
 protected:
     GdipClassT *result; // 結果の一時保持用
 public:
-    GdipTypeConvertor() : result(NULL) {}
+    GdipTypeConvertor() : result(nullptr) {}
+
     ~GdipTypeConvertor() { delete result; }
 
-    void operator()(GdipClassP &dst, const tTJSVariant &src) {
+    virtual void operator()(GdipClassP &dst, const tTJSVariant &src) {
         WrapperT *obj;
         if(src.Type() == tvtObject &&
            (obj = AdaptorT::GetNativeInstance(src.AsObjectNoAddRef()))) {
             dst = obj->getGdipObject();
         } else {
+            // FIXME: nullptr danger!!
             dst = NULL;
         }
     }
 
     void operator()(tTJSVariant &dst, const GdipClassP &src) {
-        if(src != NULL) {
+        if(src != nullptr) {
             iTJSDispatch2 *adpobj = AdaptorT::CreateAdaptor(new WrapperT(src));
             if(adpobj) {
                 dst = tTJSVariant(adpobj, adpobj);
                 adpobj->Release();
             } else {
+                // FIXME: nullptr danger!!
                 // dst = NULL;
             }
         } else {
@@ -3170,13 +3169,12 @@ public:
 
 // ------------------------------------------------------- Matrix
 
-template <class T>
-struct MatrixConvertor : public GdipTypeConvertor<T> {
-    void operator()(MatrixConvertor::GdipClassP &dst, const tTJSVariant &src) {
-        typename MatrixConvertor::WrapperT *obj;
+template <typename>
+struct MatrixConvertor : GdipTypeConvertor<GdipMatrix> {
+    void operator()(GdipClassP &dst, const tTJSVariant &src) {
+        WrapperT *obj;
         if(src.Type() == tvtObject) {
-            if((obj = MatrixConvertor::AdaptorT::GetNativeInstance(
-                    src.AsObjectNoAddRef()))) {
+            if((obj = AdaptorT::GetNativeInstance(src.AsObjectNoAddRef()))) {
                 dst = obj->getGdipObject();
             } else {
                 ncbPropAccessor info(src);
@@ -3312,12 +3310,11 @@ NCB_GDIP_METHOD(Translate);
  * 文字列からも変更可能
  */
 template <class T>
-struct ImageConvertor : public GdipTypeConvertor<T> {
-    void operator()(ImageConvertor::GdipClassP &dst, const tTJSVariant &src) {
+struct ImageConvertor : public GdipTypeConvertor<GdipImage> {
+    void operator()(GdipClassP &dst, const tTJSVariant &src) {
         if(src.Type() == tvtObject) {
-            typename ImageConvertor::WrapperT *obj;
-            if((obj = ImageConvertor::AdaptorT::GetNativeInstance(
-                    src.AsObjectNoAddRef()))) {
+            WrapperT *obj;
+            if((obj = AdaptorT::GetNativeInstance(src.AsObjectNoAddRef()))) {
                 dst = obj->getGdipObject();
             } else {
                 LayerExDraw *layer =

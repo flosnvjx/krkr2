@@ -429,8 +429,8 @@ public:
 
     tjs_real OffsetX() { return offsetx; }
     tjs_real OffsetY() { return offsety; }
-    bool Equals(const GdipMatrix &other) {
-        return memcmp(&_core, &other._core, sizeof(BLMatrix2D)) == 0;
+    bool Equals(GdipMatrix *other) {
+        return memcmp(&_core, &other->_core, sizeof(BLMatrix2D)) == 0;
     }
     bool getElements(std::vector<tjs_real> &elements) {
         BLMatrix2D m = _core;
@@ -1057,7 +1057,7 @@ public:
     /**
      * 表示トランスフォームの指定
      */
-    void setViewTransform(const GdipMatrix *transform);
+    void setViewTransform(GdipMatrix *transform);
     void resetViewTransform();
     void rotateViewTransform(tjs_real angle);
     void scaleViewTransform(tjs_real sx, tjs_real sy);
@@ -1067,7 +1067,7 @@ public:
      * トランスフォームの指定
      * @param matrix トランスフォームマトリックス
      */
-    void setTransform(const GdipMatrix *transform);
+    void setTransform(GdipMatrix *transform);
     void resetTransform();
     void rotateTransform(tjs_real angle);
     void scaleTransform(tjs_real sx, tjs_real sy);
