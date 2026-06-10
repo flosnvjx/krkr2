@@ -14,9 +14,9 @@ if(SOURCE_PATH MATCHES " ")
 endif()
 
 if (VCPKG_TARGET_ARCHITECTURE STREQUAL "x86" OR VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
-    vcpkg_find_acquire_program(NASM)
-    get_filename_component(NASM_EXE_PATH "${NASM}" DIRECTORY)
-    vcpkg_add_to_path("${NASM_EXE_PATH}")
+    vcpkg_find_acquire_program(YASM)
+    get_filename_component(YASM_EXE_PATH "${YASM}" DIRECTORY)
+    vcpkg_add_to_path("${YASM_EXE_PATH}")
 endif()
 
 set(OPTIONS "--enable-pic --disable-doc --enable-debug=3 --enable-runtime-cpudetect")
