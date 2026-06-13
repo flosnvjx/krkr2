@@ -28,7 +28,13 @@ target_sources(${PROJECT_NAME} PUBLIC
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${KRKR2CORE_PATH}/
     ${KRKR2CORE_PATH}/base
+    ${KRKR2CORE_PATH}/base/impl
     ${KRKR2CORE_PATH}/base/win32
+    ${KRKR2CORE_PATH}/event
+    ${KRKR2CORE_PATH}/event/impl
+    ${KRKR2CORE_PATH}/sysinit
+    ${KRKR2CORE_PATH}/sysinit/impl
+    ${KRKR2CORE_PATH}/kag
     ${KRKR2CORE_PATH}/environ
     ${KRKR2CORE_PATH}/environ/win32
     ${KRKR2CORE_PATH}/environ/android

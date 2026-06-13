@@ -15,7 +15,9 @@
 #include <functional>
 
 #include "tjsUtils.h"
+#include "TVPPlatform.h"
 #include "SysInitIntf.h"
+#include "SysInitImpl.h"
 #include "ScriptMgnIntf.h"
 #include "tvpgl.h"
 
@@ -32,12 +34,11 @@ extern void TVPGL_C_Init();
 // TVPSystemInit : Entire System Initialization
 //---------------------------------------------------------------------------
 void TVPSystemInit() {
-#if CC_TARGET_PLATFORM != CC_PLATFORM_WIN32
-#ifndef CC_TARGET_OS_IPHONE
+#if !defined(TVP_PLATFORM_WINDOWS)
+#ifndef TVP_PLATFORM_IOS
     if(!TVPProtectInit())
         return;
 #endif
-// #else
 #ifdef USING_PROTECT
     while(!TVPProtectInit()) {
         TVPUpdateLicense();

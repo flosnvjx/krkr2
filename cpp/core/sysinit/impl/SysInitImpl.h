@@ -30,6 +30,9 @@ extern bool TVPTerminateOnWindowClose;
 extern bool TVPTerminateOnNoWindowStartup;
 extern int TVPTerminateCode;
 
+extern bool TVPProtectInit();
+extern void TVPUpdateLicense();
+
 //---------------------------------------------------------------------------
 
 #include "SysInitIntf.h"

@@ -71,7 +71,17 @@ endif()
 
 add_library(${PROJECT_NAME} STATIC ${ENVIRON_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${ENVIRON_HEADERS_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC tjs2 PRIVATE core_base_module core_io core_visual_module core_sound_module core_plugin_module core_movie_module core_utils_module)
+
+# 组合根：对外 PUBLIC 链齐运行时栈（foundation + base + domain）
+krkr2_target_link_foundation(${PROJECT_NAME} PUBLIC)
+target_link_libraries(${PROJECT_NAME} PUBLIC
+    core_base_module
+    core_visual_module
+    core_sound_module
+    core_plugin_module
+    core_movie_module
+    core_utils_module
+)
 
 if(ANDROID OR IOS)
     target_compile_definitions(${PROJECT_NAME} PRIVATE TVP_HAS_MOBILE_FILE_BACKEND)

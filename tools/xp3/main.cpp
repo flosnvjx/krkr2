@@ -1,18 +1,42 @@
 #include <filesystem>
 #include <fstream>
+#include <iostream>
+#include <memory>
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-#include "StorageIntf.h"
+#include "XP3Archive.h"
+#include "IFileBackend.h"
+#include "StdFileBackend.h"
 
 namespace fs = std::filesystem;
 
 static constexpr size_t TVP_LOCAL_TEMP_COPY_BLOCK_SIZE = 65536 * 2;
 
 void extractArchive(const std::string &file, const std::string &destDir) {
-    const std::unique_ptr<tTVPArchive> arc{ TVPOpenArchive(ttstr{ file },
-                                                           false) };
+    const ttstr path(file);
+
+    IFileBackend *backend = TVPGetFileBackend();
+    if(!backend) {
+        std::cerr << "Storage not initialized" << std::endl;
+        return;
+    }
+
+    auto stream = backend->OpenRead(path);
+    if(!stream) {
+        std::cerr << "Cannot open: " << file << std::endl;
+        return;
+    }
+
+    tTVPArchive *raw = tTVPXP3Archive::Create(path, stream.get(), false);
+    if(!raw) {
+        std::cerr << "Not an XP3 archive: " << file << std::endl;
+        return;
+    }
+    stream.release();
+
+    const std::unique_ptr<tTVPArchive> arc(raw);
     const tjs_uint count = arc->GetCount();
     for(tjs_int i = 0; i < count; i++) {
         ttstr name = arc->GetName(i);
@@ -116,6 +140,8 @@ int main(int argc, char *argv[]) {
     static auto tjs2_logger = spdlog::stdout_color_mt("tjs2");
     spdlog::set_pattern("%^%v%$");
     spdlog::set_default_logger(core_logger);
+
+    TVPSetFileBackend(std::make_unique<StdFileBackend>());
 
     std::string output_dir = "./";
     if(program.is_used("-o")) {

@@ -15,6 +15,7 @@
 #include <ctime>
 #include "DebugIntf.h"
 #include "MsgIntf.h"
+#include "TVPVersion.h"
 #include "StorageIntf.h"
 #include "SysInitIntf.h"
 #include "SysInitImpl.h"
@@ -808,13 +809,13 @@ iTJSConsoleOutput *TVPGetTJS2DumpOutputGateway() {
 }
 //---------------------------------------------------------------------------
 
-/*
 //---------------------------------------------------------------------------
-// on-error hook
+// Register important-log append hook for TVPGetAboutString (core_msg).
 //---------------------------------------------------------------------------
-void TVPOnErrorHook()
-{
-        if(TVPMainForm) TVPMainForm->NotifySystemError();
-}
-//---------------------------------------------------------------------------
-*/
+namespace {
+    struct TVPAboutLogAppenderInstaller {
+        TVPAboutLogAppenderInstaller() {
+            TVPSetAboutLogAppender(TVPGetImportantLog);
+        }
+    } TVPAboutLogAppenderInstallerInstance;
+} // namespace

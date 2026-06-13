@@ -13,7 +13,7 @@
 #include "EventIntf.h"
 #include "ScriptMgnIntf.h"
 #include "tjsDictionary.h"
-#include "DebugIntf.h"
+#include "utils/DebugIntf.h"
 #include "TextStream.h"
 
 namespace TJS {

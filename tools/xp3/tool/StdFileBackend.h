@@ -3,7 +3,7 @@
 #include "IFileBackend.h"
 
 //---------------------------------------------------------------------------
-// 使用 std::filesystem + stdio 的默认本地文件后端
+// xp3 工具专用：stdio + std::filesystem 本地只读后端
 //---------------------------------------------------------------------------
 class StdFileBackend : public IFileBackend {
 public:

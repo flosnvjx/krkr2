@@ -31,6 +31,7 @@
 
 #include "BinaryStream.h"
 #include "Application.h"
+#include "MsgIntf.h"
 #include "impl/ApplicationSpecialPath.h"
 #include "TickCount.h"
 

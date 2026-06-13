@@ -11,6 +11,9 @@
 
 #include "audio/include/AudioEngine.h"
 
+#include "EnvironFileBackendInit.h"
+#include "EngineArchiveInit.h"
+
 static cocos2d::Size designResolutionSize(960, 640);
 
 extern std::thread::id TVPMainThreadID;
@@ -32,6 +35,11 @@ void TVPAppDelegate::applicationDidEnterBackground() {
 bool TVPAppDelegate::applicationDidFinishLaunching() {
     TVPMainThreadID = std::this_thread::get_id();
     spdlog::debug("App Finish Launching");
+
+    // 文件选择 / 命令行启动会在 StartApplication 之前调用 TVPCheckArchive
+    TVPInitEnvironFileBackends();
+    TVPInitEngineArchiveCreators();
+
     // initialize director
     auto director = cocos2d::Director::getInstance();
     auto glview = director->getOpenGLView();

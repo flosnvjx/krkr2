@@ -6,7 +6,7 @@
 #include <cstring>
 
 //---------------------------------------------------------------------------
-// tTVPMemoryStream（自 UtilStreams.cpp 提取，供工具链使用）
+// tTVPMemoryStream（自 UtilStreams.cpp 提取，归档与引擎共用）
 //---------------------------------------------------------------------------
 tTVPMemoryStream::tTVPMemoryStream() { Init(); }
 

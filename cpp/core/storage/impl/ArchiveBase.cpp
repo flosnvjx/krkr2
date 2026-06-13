@@ -4,7 +4,7 @@
 #include "MsgIntf.h"
 
 //---------------------------------------------------------------------------
-// tTVPArchive（自 StorageIntf.cpp 提取，供工具链最小存储层使用）
+// tTVPArchive 基类实现（引擎与工具链共用）
 //---------------------------------------------------------------------------
 void tTVPArchive::NormalizeInArchiveStorageName(ttstr &name) {
     if(name.IsEmpty())
@@ -85,8 +85,9 @@ bool tTVPArchive::IsExistent(const ttstr &name) {
 
 //---------------------------------------------------------------------------
 tjs_int tTVPArchive::GetFirstIndexStartsWith(const ttstr &prefix) {
+    // 归档内文件名须按 ttstr::operator< 排序；二分后可能在 s 或 s+1
     const tjs_uint total_count = GetCount();
-    tjs_int s = 0, e = total_count;
+    tjs_int s = 0, e = static_cast<tjs_int>(total_count);
     while(e - s > 1) {
         const tjs_int m = (e + s) / 2;
         if(!(GetName(m) < prefix)) {
@@ -95,7 +96,15 @@ tjs_int tTVPArchive::GetFirstIndexStartsWith(const ttstr &prefix) {
             s = m;
         }
     }
-    if(s < total_count && GetName(s).StartsWith(prefix))
+
+    if(s >= static_cast<tjs_int>(total_count))
+        return -1;
+    if(GetName(s).StartsWith(prefix))
+        return s;
+    s++;
+    if(s >= static_cast<tjs_int>(total_count))
+        return -1;
+    if(GetName(s).StartsWith(prefix))
         return s;
     return -1;
 }
