@@ -6,124 +6,112 @@
 
 ## 1. 迁移范围
 
-### 1.1 替换（外壳 UI）
+### 1.1 移除（Cocos 外壳 UI）
 
 | 现有模块 | 新归属 |
 |----------|--------|
-| `BaseForm` / `iTVPBaseForm` | `@krkr/ui-desktop` / `@krkr/ui-native` |
-| `MainFileSelectorForm` | FileSelector 页 |
-| `GlobalPreferenceForm` / `IndividualPreferenceForm` | Settings 页 |
-| `GameMainMenu` / `InGameMenuForm` | GameMenu overlay |
-| `MessageBox` | Dialog 组件 |
-| `CsdUIFactory` / `CsdUIWidgets` | 删除（由 React 组件替代） |
-| `ui/cocos-studio` 资源 | 删除（迁移完成后） |
+| `MainFileSelectorForm` | Desktop：`--xp3` / Launcher；Mobile：RN Library |
+| `GlobalPreferenceForm` / `IndividualPreferenceForm` | Launcher / RN Settings |
+| `GameMainMenu` / `InGameMenuForm` | Native 轻 overlay 或 Settings |
+| `MessageBox` | Native 或暂时保留至 P2 |
+| `CsdUIFactory` / `ui/cocos-studio` | 删除 |
+| `argv[1]` → `filePath` hack | [Launch 层](../launch/cli-parser.md) |
 
 ### 1.2 暂留后替换（游戏视口）
 
 | 现有模块 | 目标 |
-|----------|------|
-| `MainScene.cpp` | `krkr2-render` + 平台 GL 宿主 |
-| `YUVSprite` | `YUVRenderer`（shader） |
-| `TVPWindowLayer` | `ViewportCompositor` |
-| `AppDelegate.cpp` | 平台 Application（非 Cocos Director） |
+|----------|--------|
+| `MainScene.cpp` | `krkr2-render` + GL 宿主 |
+| `YUVSprite` | `YUVRenderer` |
+| `AppDelegate.cpp` | 平台窗口循环（非 Cocos Director） |
 
-### 1.3 保留不动
+### 1.3 新增
 
-- TJS / KAG / 插件 / 存档 / XP3 归档  
-- Rust 插件迁移路径（`docs/rust/`）  
-- `cpp/core/visual/RenderManager` 逻辑（实现迁到 krkr2-render，算法保留）
+| 模块 | 说明 |
+|------|------|
+| `cpp/core/environ/launch/` | CliParser、Adapter、LaunchContext |
+| `apps/launcher` | 可选 Desktop |
+| `apps/mobile-settings` | RN Settings + Native GameActivity |
 
 ---
 
-## 2. 阶段规划
+## 2. 阶段规划（修订）
 
 ```mermaid
 gantt
-    title UI 与渲染迁移（示意）
+    title 迁移路线（修订）
     dateFormat YYYY-MM
-    section P0
-    文档与 Monorepo 脚手架     :p0, 2025-07, 1M
-    section P1
-    EngineBridge + C ABI 草案    :p1a, after p0, 1M
-    Desktop 文件选择+设置        :p1b, after p1a, 2M
-    Mobile 同等页面              :p1c, after p1a, 2M
-    section P2
-    krkr2-render 抽离            :p2, after p1b, 3M
+    section L
+    Launch 层 L1-L3           :l, 2025-07, 2M
+    section U1
+    Desktop CLI 无 UI         :u1a, after l, 1M
+    RN Settings + GameActivity  :u1b, after l, 2M
+    section U2
+    可选 Launcher             :u2, after u1a, 2M
+    section R
+    krkr2-render              :r, after u1b, 3M
     section P3
-    移除 cocos2dx 依赖           :p3, after p2, 1M
+    移除 cocos2dx             :p3, after r, 1M
 ```
 
-### P0 — 准备（4～6 周）
+### L — Launch 层（优先，见 [LAUNCH_LAYER.md](../LAUNCH_LAYER.md)）
 
-- [ ] 评审并冻结本文档集  
-- [ ] 初始化 `apps/`、`packages/`、pnpm workspace  
-- [ ] 添加 `bridge/include/krkr/engine.h` 草案  
-- [ ] CI：Node job + 现有 C++ job 并行  
+- [ ] `LaunchOptions` + `CliParser` + `LaunchOptionsAdapter`
+- [ ] 统一 `platforms/*/main.cpp`
+- [ ] `launch.json` schema + `packages/shared`
+- [ ] Android `LaunchOptionsFromIntent`
 
-**交付：** 空壳 Electron 窗口 + RN 欢迎页；`EngineBridge` mock 实现。
+**交付：** `krkr2 --xp3 foo.xp3` 无文件选择 UI 可玩。
 
-### P1 — 外壳 UI 迁移（2～3 月）
-
-Cocos **仍负责 GL 渲染**；新 UI 与旧 UI 可开关并存。
+### U1 — 外壳迁移
 
 | 步骤 | Desktop | Mobile |
 |------|---------|--------|
-| 1 | Electron 文件选择页 | RN FileSelectorScreen |
-| 2 | 桥接 `scanDirectory` | 同上 |
-| 3 | 设置页 ↔ ConfigManager | 同上 |
-| 4 | `launchGame` → 现有引擎入口 | JNI launch |
-| 5 | 隐藏外壳，显示 Cocos 全屏 | KrkrGameView 暂包装 Cocos Activity |
+| 1 | 去掉默认 `MainFileSelectorForm` 弹窗 | RN Settings 壳工程 |
+| 2 | `--config` + 文件关联 | Library + Settings 屏 |
+| 3 | — | GameActivity + GL（可暂包 Cocos） |
+| 4 | GlobalConfig 仍 XML；Launcher 延后 | Intent → `apply()` |
 
-**回滚：** CMake flag `KRKR2_USE_COCOS_UI=ON` 保留旧 Form。
+**回滚：** `KRKR2_USE_COCOS_UI=ON`
 
-**验收：**
+### U2 — 可选 Launcher
 
-- 四端可浏览目录并启动游戏  
-- 设置读写与现 `PreferenceForm` 行为一致  
-- CJK 路径与文件名正常  
+- [ ] `apps/launcher`：写 JSON + spawn
+- [ ] 游戏库扫描（RN 逻辑可复用到 shared）
+- [ ] 不与引擎同包发布亦可
 
-### P2 — 渲染抽离（2～4 月）
+### R — 渲染抽离
 
-详见 [rendering.md](rendering.md)。
+见 [rendering.md](rendering.md)。与 UI 迁移 **可并行**（GameActivity 先仍用 Cocos GL）。
 
-- [ ] 新建 `cpp/core/render/`（`krkr2-render`）  
-- [ ] GLFW 窗口（Desktop）/ GLSurfaceView（Android）  
-- [ ] 迁移 LayerBitmap → 纹理上传  
-- [ ] 迁移 YUV → shader  
-- [ ] Electron / RN 视口 attach 到 `krkr_engine_attach_viewport`  
+### P3 — 移除 Cocos
 
-**回滚：** 链接旧 Cocos 渲染 target。
-
-### P3 — 移除 Cocos（1 月）
-
-- [ ] `vcpkg.json` 移除 `cocos2dx`  
-- [ ] 删除 `cpp/core/environ/cocos2d/`、`libcocos2dx`（Android）  
-- [ ] 删除 `ui/cocos-studio`、`CsdUIFactory`  
-- [ ] 更新 README / CI / 依赖文档  
+- [ ] 删 `cocos2dx` vcpkg、libcocos2dx、Cocos UI
 
 ---
 
-## 3. 功能对照清单
+## 3. 功能对照（修订）
 
-| 功能 | 现实现 | P1 | P2 | P3 |
-|------|--------|----|----|-----|
-| XP3 文件选择 | MainFileSelectorForm | React | React | React |
-| 拖拽打开 XP3 | Windows main | Electron | Electron | Electron |
-| 全局设置 | GlobalPreferenceForm | React | React | React |
-| 单游戏设置 | IndividualPreferenceForm | React | React | React |
-| 游戏内菜单 | InGameMenuForm | RN Modal / Electron overlay | 同左 | 同左 |
-| 视频播放 UI | SimpleMediaFilePlayer | 可选 Web 播放器 UI | Native 解码不变 | 同左 |
-| GL 游戏画面 | MainScene | Cocos | krkr2-render | krkr2-render |
-| 虚拟鼠标 | MainScene | Cocos | krkr2-render | krkr2-render |
-| Debug 控制台 | ConsoleWindow | 可选 DevTools / 保留 C++ | 同左 | 同左 |
+| 功能 | 现实现 | 目标 |
+|------|--------|------|
+| XP3 启动 | MainFileSelectorForm | CLI / Launcher / RN → Game |
+| Desktop 设置 | GlobalPreferenceForm | Launcher 或编辑 XML |
+| Mobile 设置 | Cocos Form | RN Settings |
+| 游戏内菜单 | InGameMenuForm | Native overlay |
+| GL 画面 | MainScene | GameActivity / Desktop 窗口 |
+| 引擎 `-debug` 等 | TVPGetCommandLine | `engineArgs` → Adapter |
 
 ---
 
-## 4. 数据与配置迁移
+## 4. 依赖关系
 
-- 配置文件路径 **不变**（`GlobalConfigManager` / `IndividualConfigManager` 路径）  
-- JS `Preferences` 类型与 C++ 字段一一映射，版本号写在 JSON schema  
-- 无需用户手动迁移；首启新 UI 读取旧配置  
+```text
+L (Launch) ──► U1 (去 Cocos UI) ──► U2 (Launcher 可选)
+                    │
+                    └──► R (render) ──► P3
+```
+
+**不必** 等 Launcher 完成再交付 CLI 引擎。
 
 ---
 
@@ -131,18 +119,16 @@ Cocos **仍负责 GL 渲染**；新 UI 与旧 UI 可开关并存。
 
 | 风险 | 缓解 |
 |------|------|
-| Electron 与 GL 窗口焦点/输入 | P1 用全屏 Cocos；P2 再做单窗口嵌入 |
-| RN 与现有 Android 工程冲突 | 新建 `apps/mobile/android`，逐步替换 `platforms/android/app` |
-| 双 UI 维护成本高 | P1 末关闭 Cocos UI 默认开关 |
-| 渲染抽离引入图形回归 | 截图对比测试；保留 `tests/visual/` |
-| CI 时间增长 | Turbo 缓存 + 分 job  artifact native lib |
+| Desktop 无 UI 影响新用户 | 发布 optional Launcher；README 写 CLI |
+| RN + Native 双 Activity | 清晰模块边界；shared schema |
+| 迁移期双 UI | `KRKR2_USE_COCOS_UI` 开关 |
 
 ---
 
-## 6. 完成定义（Definition of Done）
+## 6. 完成定义
 
-- [ ] 所有 `cpp/core/environ/ui/*Form*` 无运行时引用  
-- [ ] `find_package(cocos2dx)` 从 CMake 树消失  
-- [ ] Android APK 不含 `libcocos2d`  
-- [ ] Desktop 安装包可独立运行，不依赖外部 Cocos 资源  
-- [ ] `docs/ui/` 与实现一致，开放问题已关闭或归档  
+- [ ] 默认构建不弹出 Cocos 文件选择
+- [ ] Desktop 文档化 CLI + launch.json
+- [ ] Android Settings → Game 路径打通
+- [ ] `docs/ui/` 与 `docs/launch/` 一致
+- [ ] Cocos UI 无运行时引用（P3）

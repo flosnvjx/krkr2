@@ -1,7 +1,7 @@
 # KrKr2 UI 与外壳层
 
-> **状态：** 设计草案（待评审）  
-> **原则：** JS 管外壳 · C++ 管引擎 · 稳定 C ABI 连接两端 · 渐进替换 Cocos2d-x
+> **状态：** 设计草案（已修订）  
+> **原则：** 引擎 CLI 化 · 外壳 UI 可选且分离 · Mobile 设置与游戏分 Activity · 渐进替换 Cocos2d-x
 
 ---
 
@@ -9,17 +9,41 @@
 
 KrKr2 当前使用 **Cocos2d-x 3.17.2** 同时承担：
 
-1. **外壳 UI** — 文件选择、设置、游戏内菜单、消息框等（`cpp/core/environ/ui/`）
-2. **游戏视口** — KAG 画面合成、LayerBitmap、YUV 视频（`MainScene`、`YUVSprite` 等）
+1. **外壳 UI** — 文件选择、设置、菜单等（`cpp/core/environ/ui/`）
+2. **游戏视口** — KAG 画面、LayerBitmap、YUV（`MainScene`、`YUVSprite`）
 
-Cocos2d-x 已长期停更，UI 表现力不足。新方案采用：
+Cocos UI 已停更且表现力不足。**修订后的目标架构：**
 
-| 平台 | 外壳 UI | 游戏渲染 |
-|------|---------|----------|
-| Windows / Linux / macOS | **Electron + React** | Native GL（逐步脱离 Cocos） |
-| Android（及未来 iOS） | **React Native** | Native GL（`KrkrGameView`） |
+| 平台 | 外壳 UI | 引擎入口 | 游戏渲染 |
+|------|---------|----------|----------|
+| **Desktop** | **无内置 UI**；可选独立 **Launcher**（Electron/React） | `krkr2` CLI + [`launch.json`](../launch/launch-config.md) | Native GL（`krkr2-render`） |
+| **Mobile** | **RN Settings Activity**（库/设置） | Intent → `LaunchOptionsAdapter` | **Native Game Activity** + GL |
 
-业务逻辑与类型定义在 **`packages/shared`** 跨端复用；引擎实现保持在 **`cpp/`**，通过 **`bridge/`** 暴露稳定 C ABI。
+> Desktop **不**用 Electron BrowserWindow 嵌游戏；Mobile **不**用 RN 包 GL 视口。
+
+---
+
+## 与 Launch 层分工
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│  UI 层（本文档）                                         │
+│  · 可选 Launcher / RN Settings                         │
+│  · 写 launch.json、Intent extras、GlobalConfig overlay   │
+└───────────────────────────┬─────────────────────────────┘
+                            │ launch.json / Intent
+┌───────────────────────────▼─────────────────────────────┐
+│  Launch 层（docs/launch/）                               │
+│  · CliParser (argparse) · LaunchOptionsAdapter           │
+│  · TVPSetCommandLine · LaunchContext::xp3Path           │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│  cpp/ 引擎（krkr2core）                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+详见 [Launch 层](../LAUNCH_LAYER.md)。
 
 ---
 
@@ -27,11 +51,12 @@ Cocos2d-x 已长期停更，UI 表现力不足。新方案采用：
 
 | 顺序 | 文档 | 内容 |
 |:----:|------|------|
-| 1 | [architecture.md](architecture.md) | 分层、进程模型、平台对照 |
-| 2 | [monorepo.md](monorepo.md) | 仓库目录、包划分、构建 |
-| 3 | [bridge.md](bridge.md) | `krkr_engine_*` API、JS Bridge、线程约定 |
-| 4 | [migration.md](migration.md) | 分阶段迁移与回滚策略 |
-| 5 | [rendering.md](rendering.md) | `krkr2-render` 与 Cocos 解耦 |
+| 0 | [../launch/architecture.md](../launch/architecture.md) | CLI 与适配器（Desktop 必读） |
+| 1 | [architecture.md](architecture.md) | UI 分层、Launcher / RN 模型 |
+| 2 | [monorepo.md](monorepo.md) | `apps/launcher` + `apps/mobile-settings` |
+| 3 | [bridge.md](bridge.md) | launch.json / Intent，非 Electron 嵌引擎 |
+| 4 | [migration.md](migration.md) | 迁移阶段 |
+| 5 | [rendering.md](rendering.md) | `krkr2-render` |
 
 ---
 
@@ -39,19 +64,22 @@ Cocos2d-x 已长期停更，UI 表现力不足。新方案采用：
 
 | 目标 | 做法 |
 |------|------|
-| **现代 UI** | React 生态 + 成熟组件库 |
-| **跨端一致** | 共享 `packages/shared`（状态、类型、i18n、Bridge 契约） |
-| **语言边界清晰** | UI 在 `apps/` + `packages/`；引擎在 `cpp/`；契约在 `bridge/` |
-| **渐进迁移** | 先换外壳 UI，再抽渲染，最后移除 `cocos2dx` 依赖 |
-| **与 Rust 层共存** | 插件迁移走 `docs/rust/` 既有路径，UI 层不重复造 FFI |
+| **Desktop 轻量** | 引擎仅 CLI；图形设置交给可选 Launcher |
+| **Mobile 清晰** | Settings（RN）与 Game（Native GL）分 Activity |
+| **跨端一致** | 共享 `launch.json` schema + `packages/shared` 类型 |
+| **不嵌 GL 到 Web** | 拒绝 BrowserWindow / RN Canvas 跑 KAG |
+| **渐进迁移** | 先 Launch + 去 Cocos UI，再抽 `krkr2-render` |
 
 ---
 
-## 不在范围内
+## 明确不做
 
-- 重写 KAG / TJS 脚本引擎
-- 用 WebGL 在浏览器内渲染游戏画面
-- 以 Tauri / 纯 WebView 作为本文档的主方案（Electron + RN 为已定方向）
+| 方案 | 原因 |
+|------|------|
+| Electron 作为主壳嵌 GL | BrowserWindow 嵌入差、体积大 |
+| Electron + WASM 引擎 | 等于重写运行时 |
+| Flutter/Electron 统一包游戏画面 | 纹理共享复杂，收益低 |
+| Desktop 内置 Cocos 文件选择（长期） | 由 CLI / Launcher 替代 |
 
 ---
 
@@ -59,7 +87,7 @@ Cocos2d-x 已长期停更，UI 表现力不足。新方案采用：
 
 | 资源 | 说明 |
 |------|------|
-| [RUST_LAYER.md](../RUST_LAYER.md) | Rust 插件迁移 |
-| `cpp/core/environ/ui/` | 现有 Cocos UI 实现（迁移源） |
-| `cpp/core/environ/cocos2d/` | 现有 Cocos 集成（渲染迁移源） |
-| `platforms/android/app/` | 现有 Android 入口 |
+| [LAUNCH_LAYER.md](../LAUNCH_LAYER.md) | CLI、适配器、launch.json |
+| [RUST_LAYER.md](../RUST_LAYER.md) | Rust 插件 |
+| `cpp/core/environ/ui/` | 待废弃 Cocos UI |
+| `tools/xp3/` | argparse 参考 |

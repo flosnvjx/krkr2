@@ -8,11 +8,12 @@
 
 将游戏画面渲染从 **Cocos2d-x** 抽离为独立库 **`krkr2-render`**，供：
 
-- Electron Native 视口 / 子窗口  
-- RN `KrkrGameView`  
-- （过渡期）现有 Cocos `MainScene` 可调用同一 compositor  
+- **Desktop**：`krkr2` 进程内 GLFW / 平台全屏窗口（无 Electron 嵌 GL）
+- **Mobile**：`GameActivity` 内 `GLSurfaceView`
+- （过渡期）现有 Cocos `MainScene` 可调用同一 compositor
 
-**不改变** KAG 层输出的位图语义，只替换「如何把位图送到屏幕」。
+**不改变** KAG 层输出的位图语义，只替换「如何把位图送到屏幕」。  
+外壳 UI（Launcher / RN Settings）**不**参与渲染，见 [architecture.md](architecture.md)。
 
 ---
 
@@ -98,10 +99,10 @@ sequenceDiagram
     end
 ```
 
-Desktop Electron **子进程方案：**
+Desktop **`krkr2` 单进程窗口：**
 
-- 子进程内 GLFW 主循环  
-- 与 Electron 主进程无 GL 共享；仅 IPC 控制 show/hide/resize  
+- GLFW 主循环在引擎进程内  
+- 与可选 Launcher **无 GL 共享**；Launcher 仅 `spawn`，见 [UI 架构](architecture.md)
 
 ---
 
@@ -124,7 +125,7 @@ uniform sampler2D vPlane;
 
 | 平台 | 策略 |
 |------|------|
-| Desktop | GLFW `contentScale`；UI 外壳由 Electron 处理 DPI |
+| Desktop | GLFW `contentScale`；引擎全屏窗口自管 DPI |
 | Android | 与现 `EXACT_FIT` / 横屏逻辑对齐 |
 | macOS Retina | framebuffer scale |
 
@@ -136,7 +137,7 @@ uniform sampler2D vPlane;
 
 1. **只读抽离：** `KrkrTexture` 包装现有 `RenderManager` 上传路径，Cocos 仍 display  
 2. **双跑对比：** 同一帧 Cocos 与 krkr2-render 各画一遍，截图 diff（Debug）  
-3. **切换显示：** RN/Electron 视口只连 krkr2-render  
+3. **切换显示：** GameActivity / Desktop `krkr2` 窗口只连 krkr2-render  
 4. **删除 Cocos 渲染代码**  
 
 ---
@@ -158,6 +159,6 @@ uniform sampler2D vPlane;
 
 | # | 问题 |
 |---|------|
-| 1 | Linux Wayland vs X11 窗口嵌入 Electron |
+| 1 | Linux Wayland vs X11 全屏/窗口策略 |
 | 2 | Android 多窗口 / 画中画 是否支持 |
 | 3 | `DebugViewLayerForm` 是否保留为 native overlay |

@@ -1,244 +1,219 @@
-# 桥接层与 C ABI
+# 外壳与引擎桥接
 
 [← 索引](README.md)
 
 ---
 
-## 1. 设计目标
+## 1. 修订摘要
 
-| 目标 | 做法 |
-|------|------|
-| **单契约** | Electron N-API 与 RN JNI 只绑定 `bridge/include/krkr/engine.h` |
-| **窄接口** | 外壳 UI 所需能力；不暴露 TJS / ncbind |
-| **JSON 载荷** | 复杂结构用 JSON 字符串，避免 C 侧结构体频繁变更 |
-| **线程安全** | 引擎 API 在引擎线程；回调切到 JS 可消费线程 |
+| 初版 | **现行** |
+|------|----------|
+| Electron N-API ↔ `engine.h` | Desktop Launcher **spawn** + **`launch.json`** |
+| RN Turbo Module 同进程跑游戏 | RN **仅 Settings**；Game 为 Native Activity |
+| 统一 `krkr_engine_*` C ABI | C ABI **可选**；主路径为 **Launch 层 Adapter** |
 
-与 Rust 插件层关系：Rust 模块继续走 `bridge/include/krkr/*.h` + `docs/rust/ffi.md`；**engine.h 由 C++ 核心实现**，Rust 不替代引擎入口。
+主文档：[Launch 层 Adapter](../launch/adapter.md)
 
 ---
 
-## 2. C ABI 草案
+## 2. 桥接模型总览
+
+```text
+                    Desktop                          Mobile
+                      │                                │
+         ┌────────────┴────────────┐      ┌───────────┴───────────┐
+         │  launch.json + spawn    │      │  Intent / JSON extras │
+         └────────────┬────────────┘      └───────────┬───────────┘
+                      │                                │
+                      └──────────┬─────────────────────┘
+                                 ▼
+                    LaunchOptionsAdapter::apply()
+                      ├─ LaunchContext::xp3Path
+                      ├─ TVPSetCommandLine (engineArgs)
+                      └─ GlobalConfig overlay (optional)
+                                 ▼
+                           krkr2core 引擎
+```
+
+**Desktop Launcher 不链接引擎。**  
+**RN Settings 不链接引擎。**  
+仅 **krkr2 可执行文件 / GameActivity** 链 C++ 核心。
+
+---
+
+## 3. launch.json 契约（跨端主桥）
+
+与 [launch-config.md](../launch/launch-config.md) 一致：
+
+```json
+{
+  "xp3Path": "/games/foo.xp3",
+  "engineArgs": ["-debug=yes"],
+  "globalOverrides": { "locale": "ja" }
+}
+```
+
+| 端 | 写入 | 读取 |
+|----|------|------|
+| Desktop Launcher | `~/.config/krkr2/launch.json` | `krkr2 --config` |
+| RN Settings | Intent extra 或同路径文件 | `LaunchOptionsFromIntent` |
+| 脚本 / CI | 任意路径 | `--config` |
+
+TypeScript 类型在 `packages/shared/src/launch/LaunchProfile.ts`。
+
+---
+
+## 4. Desktop：Launcher → 引擎
+
+### 4.1 spawn（推荐）
+
+```typescript
+// apps/launcher/electron/main.ts
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs/promises';
+
+const KRKR2_EXE = process.env.KRKR2_EXE ?? 'krkr2';
+
+export async function spawnEngine(profile: LaunchProfile): Promise<void> {
+  const configPath = path.join(app.getPath('userData'), 'last-launch.json');
+  await fs.writeFile(configPath, JSON.stringify(profile, null, 2));
+
+  spawn(KRKR2_EXE, ['--config', configPath], {
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
+}
+```
+
+### 4.2 引擎侧
+
+```cpp
+// platforms/*/main.cpp
+LaunchOptions opts = parseCommandLine(argc, argv);
+LaunchOptionsAdapter::apply(opts);
+// LaunchContext::hasStartupTarget() → 跳过 Cocos 文件选择
+```
+
+**无需** Electron preload、N-API、BrowserWindow。
+
+---
+
+## 5. Mobile：Settings → Game
+
+### 5.1 RN Turbo Module（薄）
+
+```typescript
+// NativeModules.KrkrLauncher
+interface KrkrLauncherSpec {
+  startGame(profileJson: string): Promise<void>;
+  getRecentGames(): Promise<string>; // JSON
+}
+```
+
+### 5.2 Android Native
+
+```kotlin
+// KrkrLauncherModule.kt
+@ReactMethod
+fun startGame(profileJson: String, promise: Promise) {
+    val intent = Intent(reactContext, GameActivity::class.java)
+    intent.putExtra("launchProfile", profileJson)
+    reactContext.startActivity(intent)
+    promise.resolve(null)
+}
+```
+
+```cpp
+// GameActivity.onCreate
+LaunchOptions opts = LaunchOptionsFromJson(profileJson);
+LaunchOptionsAdapter::apply(opts);
+// → GLSurfaceView + engine
+```
+
+---
+
+## 6. TVPGetCommandLine 适配（引擎内）
+
+外壳 **不** 直接调 `TVPGetCommandLine`。  
+`LaunchOptionsAdapter` 将 `engineArgs` 转为 `TVPSetCommandLine`：
+
+```text
+launch.json engineArgs: ["-debug=yes"]
+    → TVPSetCommandLine(L"-debug", L"yes")
+    → 引擎内 TVPGetCommandLine(L"-debug", &val)  // 不变
+```
+
+详见 [adapter.md](../launch/adapter.md)。
+
+---
+
+## 7. 可选 C ABI（`bridge/include/krkr/engine.h`）
+
+当 **GameActivity 内** 或 **未来 in-process 工具** 需要稳定 C 接口时保留；**非 Launcher 必需**。
+
+| API | 用途 |
+|-----|------|
+| `krkr_engine_launch` | Native 启动 XP3（GameActivity 可选封装） |
+| `krkr_engine_stop` | 退出游戏回 Settings |
+| `krkr_engine_scan_directory` | Settings 扫描库（也可纯 Java/RN + Storage API） |
+
+Desktop Launcher **不必**调用上述 API。
+
+初版 `engine.h` 草案仍见下文 §8，实现优先级低于 Launch Adapter。
+
+---
+
+## 8. C ABI 草案（可选，低优先级）
 
 ```c
-// bridge/include/krkr/engine.h
-#pragma once
-#include "krkr/common.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef enum KrkrEngineError {
-    KRKR_OK = 0,
-    KRKR_ERR_INVALID_ARG = 1,
-    KRKR_ERR_NOT_INITIALIZED = 2,
-    KRKR_ERR_ALREADY_RUNNING = 3,
-    KRKR_ERR_IO = 4,
-    KRKR_ERR_ENGINE = 5,
-} KrkrEngineError;
-
-/** 引擎事件：log | progress | error | game-exited | … */
-typedef void (*KrkrEngineEventFn)(const char *event_json, void *userdata);
-
-/**
- * 初始化引擎（不含启动游戏）。
- * @param data_dir UTF-8 可写数据目录
- */
-KRKR_API KrkrEngineError krkr_engine_init(const char *data_dir);
-
-KRKR_API void krkr_engine_destroy(void);
-
-KRKR_API KrkrEngineError krkr_engine_set_event_callback(
-    KrkrEngineEventFn callback, void *userdata);
-
-/** 启动指定 xp3 / 目录；阻塞直到加载完成或失败 */
+// bridge/include/krkr/engine.h — 供 GameActivity / 测试，非 Launcher
 KRKR_API KrkrEngineError krkr_engine_launch(const char *xp3_path);
-
 KRKR_API KrkrEngineError krkr_engine_stop(void);
-KRKR_API KrkrEngineError krkr_engine_pause(void);
-KRKR_API KrkrEngineError krkr_engine_resume(void);
-
-/** 扫描目录，结果 JSON 数组写入 out_buf；返回 KRKR_OK 或缓冲区不足 */
-KRKR_API KrkrEngineError krkr_engine_scan_directory(
-    const char *dir_path, char *out_buf, size_t out_buf_size);
-
-KRKR_API KrkrEngineError krkr_engine_get_preferences(
-    char *out_buf, size_t out_buf_size);
-
-KRKR_API KrkrEngineError krkr_engine_set_preferences(const char *json_patch);
-
-/** 绑定 GL 视口（Mobile / 嵌入 Desktop 时） */
-KRKR_API KrkrEngineError krkr_engine_attach_viewport(void *native_window_handle);
-
-KRKR_API void krkr_engine_detach_viewport(void);
-
-#ifdef __cplusplus
-}
-#endif
 ```
 
-> **评审说明：** 函数集为草案，落地时与 `GlobalConfigManager`、`MainFileSelectorForm` 等现有能力逐项对齐。
+与 Rust 插件：`docs/rust/ffi.md` 路径独立。
 
 ---
 
-## 3. 事件 JSON 格式
+## 9. GlobalConfig 桥接
 
-```json
-{ "type": "log", "level": "info", "message": "..." }
-{ "type": "progress", "phase": "scan", "current": 3, "total": 10 }
-{ "type": "error", "code": "ENGINE", "message": "..." }
-{ "type": "game-exited", "code": 0 }
-```
-
-JS 侧 `EngineBridge.onEvent` 解析为 discriminated union。
-
----
-
-## 4. Desktop 桥接
-
-### 4.1 Preload 暴露
-
-```typescript
-// apps/desktop/electron/preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
-
-contextBridge.exposeInMainWorld('krkr', {
-  invoke: (method: string, params?: unknown) =>
-    ipcRenderer.invoke('krkr:engine', { method, params }),
-  onEvent: (cb: (e: unknown) => void) => {
-    const listener = (_: unknown, payload: unknown) => cb(payload);
-    ipcRenderer.on('krkr:event', listener);
-    return () => ipcRenderer.removeListener('krkr:event', listener);
-  },
-});
-```
-
-### 4.2 Main 进程路由
-
-```text
-ipcMain.handle('krkr:engine', …)
-  → KrkrEngineService (TypeScript 薄层)
-    → 方案 A: krkr_engine_* via N-API addon
-    → 方案 B: krkr2-engine 子进程 stdin/stdout JSON-RPC
-```
-
-**方案 B 示例消息：**
-
-```json
-{ "id": "1", "method": "launch", "params": { "xp3Path": "/games/foo.xp3" } }
-{ "id": "1", "result": { "ok": true } }
-```
-
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| N-API 同进程 | 低延迟、共享内存 | 引擎崩溃拖垮 Electron；需 electron-rebuild |
-| 子进程 | 崩溃隔离；与 Android 模型接近 | IPC 开销；双窗口协调 |
-
-**P1 建议：** 子进程或暂留 Cocos 窗口；P2 再评估 N-API。
-
----
-
-## 5. Mobile 桥接
-
-### 5.1 Turbo Module 骨架
-
-```typescript
-// apps/mobile/src/specs/NativeKrkrEngine.ts
-import type { TurboModule } from 'react-native';
-import { TurboModuleRegistry } from 'react-native';
-
-export interface Spec extends TurboModule {
-  init(dataDir: string): Promise<void>;
-  launchGame(xp3Path: string): Promise<void>;
-  stopGame(): Promise<void>;
-  getPreferences(): Promise<string>; // JSON
-  setPreferences(jsonPatch: string): Promise<void>;
-  addListener(eventName: string): void;
-  removeListeners(count: number): void;
-}
-
-export default TurboModuleRegistry.getEnforcing<Spec>('KrkrEngine');
-```
-
-### 5.2 Android JNI
-
-```text
-KrkrEngineModule.kt
-  → krkr_engine_launch(path)
-  → libkrkr2engine.so
-
-KrkrGameViewManager.kt
-  → GLSurfaceView + Renderer
-  → krkr_engine_attach_viewport(ANativeWindow*)
-```
-
-线程约定：
-
-- JNI 调用 → 引擎主线程（与现 `TVPMainThreadID` 一致）  
-- 事件回调 → RN `DeviceEventManagerModule.RCTDeviceEventEmitter`
-
----
-
-## 6. 线程模型
-
-```mermaid
-flowchart LR
-    subgraph js_thread [JS Thread]
-        React[React / RN UI]
-    end
-    subgraph engine_thread [Engine Thread]
-        TJS[TJS / KAG]
-        GL[GL Render]
-    end
-    React -->|async invoke| Bridge
-    Bridge -->|queue| engine_thread
-    engine_thread -->|event JSON| Bridge
-    Bridge -->|post| js_thread
-```
-
-| 操作 | 线程 |
+| 来源 | 行为 |
 |------|------|
-| `launch` / `stop` | 引擎线程 |
-| `getPreferences` | 引擎线程或只读缓存 |
-| UI 更新 | JS 线程 |
-| GL swap | 引擎 / GL 线程 |
+| `launch.json` → `globalOverrides` | `LaunchOptionsAdapter` 内存 overlay |
+| RN Settings 保存 | 写 XML（`GlobalConfigManager::SaveToFile`） |
+| Launcher「设为默认」 | overlay + `SaveToFile` |
+
+Settings UI **不** 需要 `krkr_engine_*`；读写 ConfigManager 或 JSON 即可，启动时再灌引擎。
 
 ---
 
-## 7. 错误处理
+## 10. 线程与安全
 
-```typescript
-// packages/shared/src/types/EngineError.ts
-export class EngineError extends Error {
-  constructor(
-    public readonly code: KrkrEngineErrorCode,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-```
-
-Native 返回非 `KRKR_OK` 时，Bridge 实现抛出 `EngineError`；UI 统一 Toast / Dialog。
-
----
-
-## 8. 内存与字符串
-
-| 规则 | 说明 |
+| 场景 | 约定 |
 |------|------|
-| 入参字符串 | UTF-8，`const char*` 调用期间有效 |
-| 大块输出 | 调用方分配 buffer；或后续增加 `krkr_engine_free()` + 堆分配 |
-| 路径 | 引擎内转平台路径（沿用 `TVPGetDefaultFileDir` 等） |
-
-与 `docs/rust/ffi.md` 一致：**谁分配谁释放**，在 `engine.h` 注释中写清。
+| spawn 后 Launcher 退出 | 引擎独立进程，无共享状态 |
+| Intent 传 profile | JSON 大小限制；路径 UTF-8 |
+| GameActivity | 引擎线程 ≠ RN JS 线程 |
 
 ---
 
-## 9. 测试
+## 11. 测试
 
-| 层级 | 方式 |
+| 测试 | 内容 |
 |------|------|
-| C ABI | `tests/engine_bridge_test`（Catch2，无 UI） |
-| JS Bridge | mock `EngineBridge` 单测 UI |
-| 集成 | Desktop spectron/playwright；Mobile Detox（可选） |
+| shared | `LaunchProfile` schema 校验 |
+| Launcher E2E | 写 JSON → spawn mock 二进制 |
+| Android | Intent → `apply()` → mock xp3 |
+| 集成 | `engineArgs` → `TVPGetCommandLine` |
+
+---
+
+## 12. 迁移对照（初版 bridge.md）
+
+| 删除/降级 | 替代 |
+|-----------|------|
+| Electron `contextBridge` + N-API | spawn + `--config` |
+| RN `KrkrGameView` in JS tree | Native `GameActivity` |
+| `EngineBridge.launchGame` in Launcher | `spawnEngine(profile)` |
+| BrowserWindow 事件 | 无 |

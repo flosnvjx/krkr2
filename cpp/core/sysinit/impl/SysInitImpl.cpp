@@ -545,13 +545,11 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got) {
             PushConfigFileOptions(options[0]); // has lesser priority
         } catch(...) {
             for(auto &option : options)
-                if(option)
-                    delete option;
+                delete option;
             throw;
         }
         for(auto &option : options)
-            if(option)
-                delete option;
+            delete option;
 
         // set data path
         TVPDataPath = TVPNormalizeStorageName(TVPNativeDataPath);
@@ -567,13 +565,11 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got) {
 
 //---------------------------------------------------------------------------
 static void TVPDumpOptions() {
-    std::vector<ttstr>::const_iterator i;
     ttstr options(TVPInfoSpecifiedOptionEarlierItemHasMorePriority);
-    if(TVPProgramArguments.size()) {
-        for(i = TVPProgramArguments.begin(); i != TVPProgramArguments.end();
-            i++) {
+    if(!TVPProgramArguments.empty()) {
+        for(const auto &TVPProgramArgument : TVPProgramArguments) {
             options += TJS_W(" ");
-            options += *i;
+            options += TVPProgramArgument;
         }
     } else {
         options += (const tjs_char *)TVPNone;
@@ -586,16 +582,16 @@ bool TVPGetCommandLine(const tjs_char *name, tTJSVariant *value) {
     TVPInitProgramArgumentsAndDataPath(false);
 
     tjs_int namelen = (tjs_int)TJS_strlen(name);
-    std::vector<ttstr>::const_iterator i;
-    for(i = TVPProgramArguments.begin(); i != TVPProgramArguments.end(); i++) {
-        if(!TJS_strncmp(i->c_str(), name, namelen)) {
-            if(i->c_str()[namelen] == TJS_W('=')) {
+    for(const auto &TVPProgramArgument : TVPProgramArguments) {
+        if(!TJS_strncmp(TVPProgramArgument.c_str(), name, namelen)) {
+            if(TVPProgramArgument.c_str()[namelen] == TJS_W('=')) {
                 // value is specified
-                const tjs_char *p = i->c_str() + namelen + 1;
+                const tjs_char *p = TVPProgramArgument.c_str() + namelen + 1;
                 if(value)
                     *value = p;
                 return true;
-            } else if(i->c_str()[namelen] == 0) {
+            }
+            if(TVPProgramArgument.c_str()[namelen] == 0) {
                 // value is not specified
                 if(value)
                     *value = TJS_W("yes");
@@ -611,12 +607,14 @@ void TVPSetCommandLine(const tjs_char *name, const ttstr &value) {
     //	TVPInitProgramArgumentsAndDataPath(false);
 
     tjs_int namelen = (tjs_int)TJS_strlen(name);
-    std::vector<ttstr>::iterator i;
-    for(i = TVPProgramArguments.begin(); i != TVPProgramArguments.end(); i++) {
-        if(!TJS_strncmp(i->c_str(), name, namelen)) {
-            if(i->c_str()[namelen] == TJS_W('=') || i->c_str()[namelen] == 0) {
+    for(auto &TVPProgramArgument : TVPProgramArguments) {
+        if(!TJS_strncmp(TVPProgramArgument.c_str(), name, namelen)) {
+            if(TVPProgramArgument.c_str()[namelen] == TJS_W('=') ||
+               TVPProgramArgument.c_str()[namelen] == 0) {
                 // value found
-                *i = ttstr(i->c_str(), namelen) + TJS_W("=") + value;
+                TVPProgramArgument =
+                    ttstr(TVPProgramArgument.c_str(), namelen) + TJS_W("=") +
+                    value;
                 TVPCommandLineArgumentGeneration++;
                 if(TVPCommandLineArgumentGeneration == 0)
                     TVPCommandLineArgumentGeneration = 1;
