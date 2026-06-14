@@ -31,8 +31,9 @@ set(ENVIRON_SOURCE_FILES
     ${ENVIRON_PATH}/ConfigManager/GlobalConfigManager.cpp
     ${ENVIRON_PATH}/ConfigManager/IndividualConfigManager.cpp
     ${ENVIRON_PATH}/ConfigManager/LocaleConfigManager.cpp
-    ${ENVIRON_PATH}/sdl/tvpsdl.cpp
 
+    ${ENVIRON_PATH}/ui/csd/CsdUIFactory.cpp
+    ${ENVIRON_PATH}/ui/csd/CsdUIWidgets.cpp
     ${ENVIRON_PATH}/ui/BaseForm.cpp
     ${ENVIRON_PATH}/ui/ConsoleWindow.cpp
     ${ENVIRON_PATH}/ui/DebugViewLayerForm.cpp
@@ -57,9 +58,10 @@ set(ENVIRON_SOURCE_FILES
 
 set(ENVIRON_HEADERS_DIR
     ${ENVIRON_PATH}/
+    ${ENVIRON_PATH}/ui
+    ${ENVIRON_PATH}/ui/csd
     ${ENVIRON_PATH}/impl
     $<$<BOOL:${ANDROID}>:${ENVIRON_PATH}/android>
-    ${ENVIRON_PATH}/sdl
 )
 
 if(ANDROID OR IOS)

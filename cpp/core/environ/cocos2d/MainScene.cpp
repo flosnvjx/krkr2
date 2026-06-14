@@ -282,7 +282,8 @@ public:
     static TVPWindowManagerOverlay *create() {
         auto *ret = new TVPWindowManagerOverlay();
         ret->autorelease();
-        ret->initFromFile(nullptr, Csd::createWinMgrOverlay(), nullptr);
+        ret->initUILayout(Csd::NodeBuilderFn{}, Csd::createWinMgrOverlay,
+                          Csd::NodeBuilderFn{});
         return ret;
     }
 
