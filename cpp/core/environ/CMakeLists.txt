@@ -9,6 +9,7 @@ set(ENVIRON_PATH ${CMAKE_CURRENT_LIST_DIR})
 set(ENVIRON_SOURCE_FILES
     ${ENVIRON_PATH}/Application.cpp
     ${ENVIRON_PATH}/EnvironFileBackendInit.cpp
+    ${ENVIRON_PATH}/DialogBackend.cpp
     ${ENVIRON_PATH}/DetectCPU.cpp
     ${ENVIRON_PATH}/DumpSend.cpp
     ${ENVIRON_PATH}/XP3ArchiveRepack.cpp

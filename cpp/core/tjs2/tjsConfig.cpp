@@ -14,7 +14,7 @@
 
 #include <cassert>
 #include <boost/locale.hpp>
-#include <spdlog/spdlog.h>
+#include "TVPLog.h"
 
 #ifdef _WIN32
 #include <float.h>
@@ -871,8 +871,10 @@ namespace TJS {
 
     tTJSFuncTrace::tTJSFuncTrace(const tjs_char *p) :
         funcname(boost::locale::conv::utf_to_utf<char>(p)) {
-        spdlog::debug("enter: {}", funcname);
+        TVPTjs2Log().debug("enter: {}", funcname);
     }
 
-    tTJSFuncTrace::~tTJSFuncTrace() { spdlog::debug("exit: {}", funcname); }
+    tTJSFuncTrace::~tTJSFuncTrace() {
+        TVPTjs2Log().debug("exit: {}", funcname);
+    }
 } // namespace TJS

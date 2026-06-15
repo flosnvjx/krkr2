@@ -35,8 +35,8 @@
 #include "NodeTree.h"
 #include "MotionNode.h"
 
-#define LOGGER spdlog::get("plugin")
-#define STUB_WARN(name) LOGGER->warn("Player::" #name "() stub called")
+#include "log/TVPLog.h"
+#define STUB_WARN(name) TVPPluginLog().warn("Player::" #name "() stub called")
 
 namespace motion {
     namespace internal {

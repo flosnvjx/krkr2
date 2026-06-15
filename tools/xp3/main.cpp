@@ -3,9 +3,9 @@
 #include <iostream>
 #include <memory>
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 
+#include "log/TVPInitLog.h"
+#include "log/TVPDialog.h"
 #include "XP3Archive.h"
 #include "IFileBackend.h"
 #include "StdFileBackend.h"
@@ -125,6 +125,8 @@ int main(int argc, char *argv[]) {
         .nargs(argparse::nargs_pattern::at_least_one);
 
     program.add_argument("-o", "--output").help("output dir path");
+    program.add_argument("-l", "--loglevel")
+        .help("log level spec, e.g. debug or tjs2:debug,core:info");
 
     try {
         program.parse_args(argc, argv);
@@ -134,12 +136,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    spdlog::set_level(spdlog::level::debug);
-
-    static auto core_logger = spdlog::stdout_color_mt("core");
-    static auto tjs2_logger = spdlog::stdout_color_mt("tjs2");
-    spdlog::set_pattern("%^%v%$");
-    spdlog::set_default_logger(core_logger);
+    TVPLoggingOptions log_options;
+    log_options.level = TVPLogInitLevel::Debug;
+    log_options.pattern = "%^%v%$";
+    log_options.plugin_logger = false;
+    std::string loglevel_spec;
+    if(program.is_used("--loglevel")) {
+        loglevel_spec = program.get<std::string>("--loglevel");
+        log_options.log_level = loglevel_spec.c_str();
+    }
+    TVPInitLogging(log_options);
+    TVPSetDialogBackend(nullptr);
 
     TVPSetFileBackend(std::make_unique<StdFileBackend>());
 

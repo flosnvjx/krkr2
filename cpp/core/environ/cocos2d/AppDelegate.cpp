@@ -1,4 +1,4 @@
-#include <spdlog/spdlog.h>
+#include "TVPLog.h"
 #include "AppDelegate.h"
 
 #include "MainScene.h"
@@ -13,6 +13,7 @@
 
 #include "EnvironFileBackendInit.h"
 #include "EngineArchiveInit.h"
+#include "DialogBackend.h"
 
 static cocos2d::Size designResolutionSize(960, 640);
 
@@ -34,7 +35,8 @@ void TVPAppDelegate::applicationDidEnterBackground() {
 
 bool TVPAppDelegate::applicationDidFinishLaunching() {
     TVPMainThreadID = std::this_thread::get_id();
-    spdlog::debug("App Finish Launching");
+    TVPInitNativeDialogBackend();
+    TVPCoreLog().debug("App Finish Launching");
 
     // 文件选择 / 命令行启动会在 StartApplication 之前调用 TVPCheckArchive
     TVPInitEnvironFileBackends();

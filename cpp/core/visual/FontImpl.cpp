@@ -10,6 +10,7 @@
 #include <cmath>
 #include "Application.h"
 #include "Platform.h"
+#include "TVPLog.h"
 #include "ConfigManager/IndividualConfigManager.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -222,7 +223,7 @@ void TVPInitFontNames() {
             auto data = cocos2d::FileUtils::getInstance()->getDataFromFile(
                 "NotoSansCJK-Regular.ttc");
             if(data.isNull()) {
-                spdlog::critical("can't found internal font file!");
+                TVPCoreLog().critical("can't found internal font file!");
                 exit(-1);
             }
             if(TVPInternalEnumFonts(

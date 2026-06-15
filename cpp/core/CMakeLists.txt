@@ -7,6 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 add_library(${PROJECT_NAME} INTERFACE)
 
 add_subdirectory(tjs2)
+add_subdirectory(log)
 add_subdirectory(io)
 add_subdirectory(msg)
 add_subdirectory(sysinit)

@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <ctime>
 #include "DebugIntf.h"
+#include "TVPLog.h"
 #include "MsgIntf.h"
 #include "TVPVersion.h"
 #include "StorageIntf.h"
@@ -396,6 +397,11 @@ void TVPAddLog(const ttstr &line, bool appendtoimportant) {
 
     if(TVPLoggingToFile)
         TVPLogStreamHolder.Log(buf);
+
+    if(appendtoimportant)
+        TVPEngineLog().warn(line.AsStdString());
+    else
+        TVPEngineLog().info(line.AsStdString());
 }
 
 //---------------------------------------------------------------------------

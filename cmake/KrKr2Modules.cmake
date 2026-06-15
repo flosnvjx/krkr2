@@ -2,6 +2,7 @@
 set(KRKR2_CORE_DIR ${CMAKE_SOURCE_DIR}/cpp/core CACHE INTERNAL "")
 
 set(KRKR2_FOUNDATION_LIBS
+    core_log
     tjs2
     core_io
     core_msg

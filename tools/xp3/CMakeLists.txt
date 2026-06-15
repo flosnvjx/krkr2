@@ -13,10 +13,11 @@ add_executable(${PROJECT_NAME}
 )
 
 find_package(argparse CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${XP3_PATH}/tool
+    ${CMAKE_SOURCE_DIR}/cpp/core
+    ${CMAKE_SOURCE_DIR}/cpp/core/utils
     ${CMAKE_SOURCE_DIR}/cpp/core/archive/xp3
     ${CMAKE_SOURCE_DIR}/cpp/core/environ
     ${KRKR2_CORE_API_INCLUDE_DIRS}
@@ -24,7 +25,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     argparse::argparse
-    spdlog::spdlog
+    core_log
     core_storage
 )
 

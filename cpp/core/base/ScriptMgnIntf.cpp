@@ -15,6 +15,7 @@
 #include "tjsDebug.h"
 #include "tjsArray.h"
 #include "ScriptMgnIntf.h"
+#include "TVPLog.h"
 #include "StorageIntf.h"
 #include "DebugIntf.h"
 #include "WindowIntf.h"
@@ -886,7 +887,7 @@ void TVPExecuteStartupScript() {
     try {
 
         ttstr place(TVPSearchPlacedPath(TVPStartupScriptName));
-        spdlog::info("Loading startup script: {}", place.AsStdString());
+        TVPCoreLog().info("Loading startup script: {}", place.AsStdString());
         TVPStartupSuccess = false;
         try {
             iTJSTextReadStream *stream = TVPCreateTextStreamForRead(place, "");
@@ -904,7 +905,7 @@ void TVPExecuteStartupScript() {
             TVPExecuteStorage(TJS_W("system/Initialize.tjs"));
             TVPStartupSuccess = true;
         }
-        spdlog::info("Startup script ended.");
+        TVPCoreLog().info("Startup script ended.");
         try {
             ttstr patch = TVPGetAppPath() + "AfterStartup.tjs";
             if(TVPIsExistentStorageNoSearch(patch))

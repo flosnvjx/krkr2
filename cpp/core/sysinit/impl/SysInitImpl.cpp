@@ -24,6 +24,7 @@
 #include "impl/SystemControl.h"
 #include "DebugIntf.h"
 #include "tjsLex.h"
+#include "TVPLogLevelConfig.h"
 #include "LayerIntf.h"
 #include "Random.h"
 #include "DetectCPU.h"
@@ -485,6 +486,17 @@ void TVPEnsureDataPathDirectory() {
 //---------------------------------------------------------------------------
 static void PushAllCommandlineArguments() {}
 
+static void TVPApplyProgramLogLevelOption() {
+    for(const auto &arg : TVPProgramArguments) {
+        const tjs_char *p = arg.c_str();
+        if(!TJS_strncmp(p, TJS_W("-loglevel="), 10)) {
+            ttstr spec(p + 10);
+            TVPApplyLogLevelSpec(spec.AsStdString().c_str(), TVPLogLevel::Info);
+            return;
+        }
+    }
+}
+
 //---------------------------------------------------------------------------
 static void PushConfigFileOptions(const std::vector<std::string> *options) {
     if(!options)
@@ -557,6 +569,7 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got) {
 
         // set log output directory
         TVPSetLogLocation(TVPNativeDataPath);
+        TVPApplyProgramLogLevelOption();
 
         // increment TVPCommandLineArgumentGeneration
         TVPCommandLineArgumentGeneration++;

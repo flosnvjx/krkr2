@@ -22,6 +22,7 @@
 #include "XP3RepackForm.h"
 #include "csd/CsdUIFactory.h"
 #include "csd/CsdUILayout.h"
+#include "TVPLog.h"
 
 using namespace cocos2d;
 using namespace cocos2d::ui;
@@ -191,8 +192,8 @@ void TVPMainFileSelectorForm::onCellClicked(int idx) {
     FileInfo info = CurrentDirList[idx];
     TVPBaseFileSelectorForm::onCellClicked(idx);
 
-    spdlog::debug("Selected file: {}, FullPath: {}", info.NameForDisplay,
-                  info.FullPath);
+    TVPCoreLog().debug("Selected file: {}, FullPath: {}", info.NameForDisplay,
+                       info.FullPath);
     runFromPath(info.FullPath);
 }
 

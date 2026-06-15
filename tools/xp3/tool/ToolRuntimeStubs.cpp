@@ -1,19 +1,24 @@
 #include "tjsCommHead.h"
 
+#include "DebugIntf.h"
 #include "EventIntf.h"
 #include "SysInitIntf.h"
-
-#include <spdlog/spdlog.h>
+#include "TVPLog.h"
 
 //---------------------------------------------------------------------------
 // 工具链运行时桩：避免链接 environ / utils / 完整 event 模块
 //---------------------------------------------------------------------------
 
-void TVPAddLog(const ttstr &line, bool) {
-    spdlog::info("{}", line.AsNarrowStdString());
+void TVPAddLog(const ttstr &line, bool important) {
+    if(important)
+        TVPEngineLog().warn(line.AsStdString());
+    else
+        TVPEngineLog().info(line.AsStdString());
 }
 
 void TVPAddLog(const ttstr &line) { TVPAddLog(line, false); }
+
+void TVPAddImportantLog(const ttstr &line) { TVPAddLog(line, true); }
 
 //---------------------------------------------------------------------------
 void TVPAddCompactEventHook(tTVPCompactEventCallbackIntf *) {}
