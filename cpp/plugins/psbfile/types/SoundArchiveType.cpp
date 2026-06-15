@@ -24,8 +24,7 @@ namespace PSB {
     SoundArchiveType::collectResources(const PSBFile &psb, bool deDuplication) {
         std::vector<std::unique_ptr<IResourceMetadata>> resourceList;
         // TODO:
-        TVPPluginLog().critical(
-            "TODO: SoundArchiveType::collectResources(...)");
+        G_PluginLog.critical("TODO: SoundArchiveType::collectResources(...)");
         return resourceList;
     }
 } // namespace PSB

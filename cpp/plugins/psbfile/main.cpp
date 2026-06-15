@@ -53,8 +53,7 @@ static tjs_error load(tTJSVariant *r, tjs_int count, tTJSVariant **p,
     if((*p)->Type() == tvtString) {
         ttstr path{ **p };
         if(!self->loadPSBFile(path)) {
-            TVPPluginLog().info("cannot load psb file : {}",
-                                path.AsStdString());
+            G_PluginLog.info("cannot load psb file : {}", path.AsStdString());
             loadSuccess = false;
         }
         auto objs = self->getObjects();
@@ -68,7 +67,7 @@ static tjs_error load(tTJSVariant *r, tjs_int count, tTJSVariant **p,
             psbMedia->add((path + TJS_W("/") + pathN).AsStdString(), res);
         }
     } else if((*p)->Type() == tvtOctet) {
-        TVPPluginLog().critical("PSBFile::load stream no implement!");
+        G_PluginLog.critical("PSBFile::load stream no implement!");
         loadSuccess = false;
     } else {
         return TJS_E_INVALIDPARAM;

@@ -24,7 +24,7 @@ namespace PSB {
     MotionType::collectResources(const PSBFile &psb, bool deDuplication) {
         std::vector<std::unique_ptr<IResourceMetadata>> resourceList;
         // TODO:
-        TVPPluginLog().critical("TODO: MotionType::collectResources(...)");
+        G_PluginLog.critical("TODO: MotionType::collectResources(...)");
         return resourceList;
     }
 } // namespace PSB

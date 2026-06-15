@@ -31,7 +31,7 @@ namespace PSB {
     ScnType::collectResources(const PSBFile &psb, bool deDuplication) {
         std::vector<std::unique_ptr<IResourceMetadata>> resourceList;
         // TODO:
-        TVPPluginLog().critical("TODO: ScnType::collectResources(...)");
+        G_PluginLog.critical("TODO: ScnType::collectResources(...)");
         return resourceList;
     }
 } // namespace PSB

@@ -5,6 +5,7 @@
 #include "TVPLogLevelConfig.h"
 
 #include <cstring>
+#include <string>
 
 #include <spdlog/spdlog.h>
 #if defined(ANDROID)
@@ -18,7 +19,7 @@ namespace {
     constexpr auto kDefaultLogPattern =
         "%Y-%m-%dT%H:%M:%S.%e%z %^%-5L%$ %t --- [%n] : %v";
 
-    spdlog::level::level_enum toSpdlogInitLevel(TVPLogInitLevel level) {
+    spdlog::level::level_enum toSpdlogInitLevel(const TVPLogInitLevel level) {
         switch(level) {
             case TVPLogInitLevel::Trace:
                 return spdlog::level::trace;
@@ -36,34 +37,34 @@ namespace {
         return spdlog::level::info;
     }
 
-    void ensureNamedLogger(const char *name) {
-        if(spdlog::get(name))
-            return;
-
-#if defined(ANDROID)
-        static const struct {
-            const char *name;
-            const char *tag;
-        } kAndroidLoggers[] = {
-            { "core", "KrKr2NativeCore" },
-            { "tjs2", "KrKr2NativeTjs2" },
-            { "plugin", "KrKr2NativePlugin" },
-        };
-        for(const auto &entry : kAndroidLoggers) {
-            if(std::strcmp(entry.name, name) == 0) {
-                spdlog::android_logger_mt(entry.name, entry.tag);
-                return;
-            }
-        }
-        spdlog::android_logger_mt(name, name);
-#else
-        spdlog::stdout_color_mt(name);
-#endif
-    }
-
 } // namespace
 
-TVPLogLevel initLevelToLogLevel(TVPLogInitLevel level) {
+#if defined(ANDROID)
+// logcat tag: KrKr2 + capitalized category, e.g. core -> KrKr2Core, tjs2 ->
+// KrKr2Tjs2
+static std::string makeAndroidLogTag(const char *name) {
+    if(!name || *name == '\0')
+        return "KrKr2";
+    std::string tag = "KrKr2";
+    tag += static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+    tag += name + 1;
+    return tag;
+}
+#endif
+
+void TVPEnsureSpdlogLogger(const char *name) {
+    if(!name || spdlog::get(name))
+        return;
+
+#if defined(ANDROID)
+    spdlog::android_logger_mt(name, makeAndroidLogTag(name));
+#else
+    spdlog::stdout_color_mt(name);
+#endif
+    TVPApplySpdlogLoggerLevel(name);
+}
+
+TVPLogLevel initLevelToLogLevel(const TVPLogInitLevel level) {
     switch(level) {
         case TVPLogInitLevel::Trace:
             return TVPLogLevel::Trace;
@@ -81,7 +82,7 @@ TVPLogLevel initLevelToLogLevel(TVPLogInitLevel level) {
     return TVPLogLevel::Info;
 }
 
-const char *TVPExtractLogLevelFromArgv(int argc, char **argv) {
+const char *TVPExtractLogLevelFromArgv(const int argc, char **argv) {
     for(int i = 1; i < argc; ++i) {
         const char *arg = argv[i];
         if(!arg)
@@ -107,9 +108,11 @@ void TVPEnsureSpdlogLoggers(const TVPLoggingOptions &options) {
     spdlog::set_level(toSpdlogInitLevel(options.level));
     spdlog::set_pattern(options.pattern ? options.pattern : kDefaultLogPattern);
 
-    ensureNamedLogger("core");
-    ensureNamedLogger("tjs2");
-    ensureNamedLogger("plugin");
+    TVPEnsureSpdlogLogger("core");
+    TVPEnsureSpdlogLogger("tjs2");
+    TVPEnsureSpdlogLogger("plugin");
+    TVPEnsureSpdlogLogger("engine");
+    TVPEnsureSpdlogLogger("exception");
 
     spdlog::set_default_logger(spdlog::get("core"));
 }

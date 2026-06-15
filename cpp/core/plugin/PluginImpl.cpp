@@ -48,9 +48,9 @@ bool TVPLoadInternalPlugin(const ttstr &_name);
 void TVPLoadPlugin(const ttstr &name) {
     auto pluginName = name;
     if(TVPLoadInternalPlugin(pluginName)) {
-        TVPPluginLog().debug("Loading Plugin: {} Success", name.AsStdString());
+        G_PluginLog.debug("Loading Plugin: {} Success", name.AsStdString());
     } else {
-        TVPPluginLog().error("Loading Plugin: {} Failed", name.AsStdString());
+        G_PluginLog.error("Loading Plugin: {} Failed", name.AsStdString());
     }
 }
 

@@ -491,7 +491,7 @@ void tTVPApplication::BringToFront() {
 }
 #endif
 void tTVPApplication::ShowException(const ttstr &e) {
-    TVPExceptionLog().error(e.AsStdString());
+    G_ExceptionLog.error(e.AsStdString());
     TVPShowDialogMessage(e.AsStdString(),
                          TVPGetErrorDialogTitle().AsStdString());
     TVPSystemUninit();

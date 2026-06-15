@@ -91,12 +91,12 @@ void TVPListDir(const std::string &u8folder,
         int len = WideCharToMultiByte(CP_ACP, 0, wfolder.c_str(), -1, nullptr,
                                       0, nullptr, nullptr);
         if(len <= 0)
-            TVPCoreLog().error("Failed to list directory: {}", u8folder);
+            G_CoreLog.error("Failed to list directory: {}", u8folder);
         std::string local(len - 1, '\0');
         WideCharToMultiByte(CP_ACP, 0, wfolder.c_str(), -1, local.data(),
                             len - 1, nullptr, nullptr);
         // 目录不存在或无权限，静默返回
-        TVPCoreLog().error("Failed to list directory: {}", local);
+        G_CoreLog.error("Failed to list directory: {}", local);
     }
 
 #else
@@ -300,7 +300,7 @@ int TVPCheckArchive(const ttstr &localname) {
             }
         }
     } catch(eTJSError e) {
-        TVPCoreLog().error("Error opening archive {}", localname.toString());
+        G_CoreLog.error("Error opening archive {}", localname.toString());
     }
     if(arc) {
         delete arc;

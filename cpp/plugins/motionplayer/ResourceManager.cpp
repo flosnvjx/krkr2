@@ -76,8 +76,8 @@ motion::ResourceManager::ResourceManager(iTJSDispatch2 *kag,
     if(cacheSize > 0) {
         _state->cacheSize = cacheSize;
     }
-    TVPPluginLog().info("ResourceManager: kag={} cacheSize={}",
-                        static_cast<void *>(kag), _state->cacheSize);
+    G_PluginLog.info("ResourceManager: kag={} cacheSize={}",
+                     static_cast<void *>(kag), _state->cacheSize);
 
     // Pre-define ShortCutInitialPadKeyMap on the KAG window if not already set.
     // The encrypted keybinder.tjs accesses .ShortCutInitialPadKeyMap on the
@@ -118,7 +118,7 @@ tjs_error motion::ResourceManager::setEmotePSBDecryptSeed(tTJSVariant *,
         return TJS_E_INVALIDPARAM;
     }
     _decryptSeed = static_cast<tjs_int>(*p[0]);
-    TVPPluginLog().info("setEmotePSBDecryptSeed: {}", _decryptSeed);
+    G_PluginLog.info("setEmotePSBDecryptSeed: {}", _decryptSeed);
     return TJS_S_OK;
 }
 
@@ -133,8 +133,8 @@ tjs_error motion::ResourceManager::setEmotePSBDecryptFunc(tTJSVariant *,
         return TJS_E_INVALIDPARAM;
     }
     _decryptFunc = p[0]->AsObjectClosure();
-    TVPPluginLog().info("setEmotePSBDecryptFunc: {}",
-                        _decryptFunc.Object ? "closure stored" : "cleared");
+    G_PluginLog.info("setEmotePSBDecryptFunc: {}",
+                     _decryptFunc.Object ? "closure stored" : "cleared");
     return TJS_S_OK;
 }
 
@@ -142,15 +142,15 @@ tTJSVariant motion::ResourceManager::load(ttstr path) const {
     const auto rawPath = path.AsStdString();
     const auto loweredPath = lowercase(rawPath);
     if(loweredPath.find(".mtn") != std::string::npos) {
-        TVPPluginLog().debug("ResourceManager::load motion: {}", rawPath);
+        G_PluginLog.debug("ResourceManager::load motion: {}", rawPath);
     } else if(loweredPath.find(".psb") != std::string::npos) {
-        TVPPluginLog().debug("ResourceManager::load emote/psb: {}", rawPath);
+        G_PluginLog.debug("ResourceManager::load emote/psb: {}", rawPath);
     }
 
     const auto loaded = detail::loadPSBVariant(path, _decryptSeed);
     if(loaded.Type() != tvtObject || !_state) {
         if(loaded.Type() == tvtVoid) {
-            TVPPluginLog().warn("ResourceManager::load({}) failed", rawPath);
+            G_PluginLog.warn("ResourceManager::load({}) failed", rawPath);
         }
         return loaded;
     }
@@ -168,7 +168,7 @@ tTJSVariant motion::ResourceManager::loadSource(ttstr path) const {
 }
 
 void motion::ResourceManager::unload(ttstr path) const {
-    TVPPluginLog().debug("ResourceManager::unload({})", path.AsStdString());
+    G_PluginLog.debug("ResourceManager::unload({})", path.AsStdString());
     if(!_state) {
         return;
     }
@@ -203,7 +203,7 @@ void motion::ResourceManager::unload(ttstr path) const {
 }
 
 void motion::ResourceManager::clearCache() const {
-    TVPPluginLog().debug("ResourceManager::clearCache()");
+    G_PluginLog.debug("ResourceManager::clearCache()");
     if(!_state) {
         return;
     }
@@ -253,8 +253,8 @@ tTJSVariant motion::ResourceManager::findLoadedModule(ttstr path) const {
         }
     }
 
-    TVPPluginLog().debug("ResourceManager::findLoadedModule({}): cache miss",
-                         path.AsStdString());
+    G_PluginLog.debug("ResourceManager::findLoadedModule({}): cache miss",
+                      path.AsStdString());
     return {};
 }
 

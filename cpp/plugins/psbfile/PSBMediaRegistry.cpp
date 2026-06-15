@@ -82,7 +82,7 @@ namespace PSB {
         psbMedia = new PSBMedia();
         TVPRegisterStorageMedia(psbMedia);
         psbMedia->Release();
-        TVPPluginLog().info("initPsbFile");
+        G_PluginLog.info("initPsbFile");
     }
 
     void deInitPSBMedia() {
@@ -90,7 +90,7 @@ namespace PSB {
             TVPUnregisterStorageMedia(psbMedia);
             psbMedia = nullptr;
         }
-        TVPPluginLog().info("deInitPsbFile");
+        G_PluginLog.info("deInitPsbFile");
     }
 
     void

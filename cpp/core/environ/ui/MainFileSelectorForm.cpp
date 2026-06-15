@@ -192,8 +192,8 @@ void TVPMainFileSelectorForm::onCellClicked(int idx) {
     FileInfo info = CurrentDirList[idx];
     TVPBaseFileSelectorForm::onCellClicked(idx);
 
-    TVPCoreLog().debug("Selected file: {}, FullPath: {}", info.NameForDisplay,
-                       info.FullPath);
+    G_CoreLog.debug("Selected file: {}, FullPath: {}", info.NameForDisplay,
+                    info.FullPath);
     runFromPath(info.FullPath);
 }
 

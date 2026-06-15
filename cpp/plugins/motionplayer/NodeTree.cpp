@@ -408,7 +408,7 @@ namespace motion::detail {
             }
         }
 
-        TVPPluginLog().debug(
+        G_PluginLog.debug(
             "buildNodeTree: clipLabel='{}', rootLayers={}, {} nodes built",
             clipLabel, layerList->size(), runtime.nodes.size());
     }

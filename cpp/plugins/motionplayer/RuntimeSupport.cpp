@@ -1268,8 +1268,8 @@ namespace motion::detail {
             auto file = std::make_shared<PSB::PSBFile>();
             file->setSeed(decryptSeed);
             if(!file->loadPSBFile(path)) {
-                TVPPluginLog().error("motion load file: {} failed",
-                                     path.AsStdString());
+                G_PluginLog.error("motion load file: {} failed",
+                                  path.AsStdString());
                 return nullptr;
             }
             return file;
@@ -1404,8 +1404,8 @@ namespace motion::detail {
             return nullptr;
         }
         if(file->getType() != PSB::PSBType::Motion) {
-            TVPPluginLog().error("this psb file is not motion file: {}",
-                                 path.AsStdString());
+            G_PluginLog.error("this psb file is not motion file: {}",
+                              path.AsStdString());
             return nullptr;
         }
 
@@ -1731,10 +1731,9 @@ namespace motion::detail {
         std::lock_guard lock(logoTraceMutex());
         auto &session = ensureLogoTraceSessionLocked(motionPath);
         ++session.sequence;
-        TVPPluginLog().warn(
-            "CHAIN SEQ={} stage={} func={} motion={} frame={} {}",
-            session.sequence, stage, func, session.motionName,
-            frameLabel(frameTime), message);
+        G_PluginLog.warn("CHAIN SEQ={} stage={} func={} motion={} frame={} {}",
+                         session.sequence, stage, func, session.motionName,
+                         frameLabel(frameTime), message);
     }
 
     void logoChainTraceCheck(const std::string &motionPath, const char *stage,
@@ -1749,7 +1748,7 @@ namespace motion::detail {
         std::lock_guard lock(logoTraceMutex());
         auto &session = ensureLogoTraceSessionLocked(motionPath);
         ++session.sequence;
-        TVPPluginLog().warn(
+        G_PluginLog.warn(
             "CHAIN SEQ={} stage={} func={} motion={} frame={} exp={} "
             "act={} ok={}",
             session.sequence, stage, func, session.motionName,
@@ -1800,13 +1799,12 @@ namespace motion::detail {
             ? std::string("not_detected_in_logged_fields")
             : session.likelyRootCause;
 
-        TVPPluginLog().warn(
-            "CHAIN SUMMARY func={} motion={} frame={} "
-            "first_bad_stage={} expected={} actual={} "
-            "upstream_last_good_stage={} likely_root_cause={}{}{}",
-            func, session.motionName, frameLabel(frameTime), firstBadStage,
-            expected, actual, upstream, rootCause,
-            note.empty() ? "" : " note=", note);
+        G_PluginLog.warn("CHAIN SUMMARY func={} motion={} frame={} "
+                         "first_bad_stage={} expected={} actual={} "
+                         "upstream_last_good_stage={} likely_root_cause={}{}{}",
+                         func, session.motionName, frameLabel(frameTime),
+                         firstBadStage, expected, actual, upstream, rootCause,
+                         note.empty() ? "" : " note=", note);
     }
 
     // Scan PSB layer tree for action/sync events between prevTime and newTime.

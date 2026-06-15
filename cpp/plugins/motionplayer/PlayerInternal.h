@@ -36,7 +36,7 @@
 #include "MotionNode.h"
 
 #include "log/TVPLog.h"
-#define STUB_WARN(name) TVPPluginLog().warn("Player::" #name "() stub called")
+#define STUB_WARN(name) G_PluginLog.warn("Player::" #name "() stub called")
 
 namespace motion {
     namespace internal {

@@ -11,9 +11,9 @@
 
 void TVPAddLog(const ttstr &line, bool important) {
     if(important)
-        TVPEngineLog().warn(line.AsStdString());
+        G_EngineLog.warn(line.AsStdString());
     else
-        TVPEngineLog().info(line.AsStdString());
+        G_EngineLog.info(line.AsStdString());
 }
 
 void TVPAddLog(const ttstr &line) { TVPAddLog(line, false); }

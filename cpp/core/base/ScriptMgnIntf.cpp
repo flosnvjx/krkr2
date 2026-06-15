@@ -887,7 +887,7 @@ void TVPExecuteStartupScript() {
     try {
 
         ttstr place(TVPSearchPlacedPath(TVPStartupScriptName));
-        TVPCoreLog().info("Loading startup script: {}", place.AsStdString());
+        G_CoreLog.info("Loading startup script: {}", place.AsStdString());
         TVPStartupSuccess = false;
         try {
             iTJSTextReadStream *stream = TVPCreateTextStreamForRead(place, "");
@@ -905,7 +905,7 @@ void TVPExecuteStartupScript() {
             TVPExecuteStorage(TJS_W("system/Initialize.tjs"));
             TVPStartupSuccess = true;
         }
-        TVPCoreLog().info("Startup script ended.");
+        G_CoreLog.info("Startup script ended.");
         try {
             ttstr patch = TVPGetAppPath() + "AfterStartup.tjs";
             if(TVPIsExistentStorageNoSearch(patch))

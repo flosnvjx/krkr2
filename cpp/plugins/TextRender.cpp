@@ -305,7 +305,7 @@ public:
     void clear();
     void done();
 
-    void newline() { TVPPluginLog().warn("no support newline"); }
+    void newline() { G_PluginLog.warn("no support newline"); }
 
     void resetFont();
     void resetStyle();

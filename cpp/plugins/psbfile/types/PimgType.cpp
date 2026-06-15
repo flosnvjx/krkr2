@@ -57,7 +57,7 @@ namespace PSB {
                                   (*dic)["layer_id"].get())) {
                         layerId = static_cast<int>(*nLayerId);
                     } else {
-                        TVPPluginLog().critical("layer_id is wrong.");
+                        G_PluginLog.critical("layer_id is wrong.");
                         continue;
                     }
 
@@ -96,8 +96,8 @@ namespace PSB {
                         res = dynamic_cast<ImageMetadata *>(foundItem);
                         if(!res) {
                             continue;
-                            TVPPluginLog().warn("convert ImageMetadata to "
-                                                "IResourceMetadata Failed!");
+                            G_PluginLog.warn("convert ImageMetadata to "
+                                             "IResourceMetadata Failed!");
                         }
                     } else {
                         continue;

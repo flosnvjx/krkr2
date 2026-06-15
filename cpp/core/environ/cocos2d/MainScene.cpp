@@ -1339,13 +1339,11 @@ void TVPConsoleLog(const ttstr &l, bool important) {
 }
 
 namespace TJS {
-    void TVPConsoleLog(const ttstr &str) {
-        TVPTjs2Log().info(str.AsStdString());
-    }
+    void TVPConsoleLog(const ttstr &str) { G_Tjs2Log.info(str.AsStdString()); }
 
     template <typename... Args>
     void TVPConsoleLog(fmt::format_string<Args...> fmt, Args &&...args) {
-        TVPTjs2Log().info(fmt, std::forward<Args>(args)...);
+        G_Tjs2Log.info(fmt, std::forward<Args>(args)...);
     }
 } // namespace TJS
 

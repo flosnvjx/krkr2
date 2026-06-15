@@ -401,7 +401,7 @@ public:
      * 実ファイルがある場合のみ処理されます
      */
     static bool truncateFile(const tjs_char *file, tjs_int size) {
-        TVPPluginLog().warn("truncateFile not impl!! but ret true");
+        G_PluginLog.warn("truncateFile not impl!! but ret true");
         return true;
     }
 
@@ -685,7 +685,7 @@ public:
         }
         dir = TVPNormalizeStorageName(dir);
         TVPGetLocalName(dir);
-        TVPPluginLog().warn("changeDirectory not impl!! but ret true");
+        G_PluginLog.warn("changeDirectory not impl!! but ret true");
         return true;
     }
 
@@ -698,7 +698,7 @@ public:
     static bool setFileAttributes(ttstr filename, DWORD attr) {
         filename = TVPNormalizeStorageName(filename);
         TVPGetLocalName(filename);
-        TVPPluginLog().warn("setFileAttributes not impl!! but ret true");
+        G_PluginLog.warn("setFileAttributes not impl!! but ret true");
         return true;
     }
 
@@ -712,7 +712,7 @@ public:
         filename = TVPNormalizeStorageName(filename);
         TVPGetLocalName(filename);
 
-        TVPPluginLog().warn("resetFileAttributes not impl!! but ret true");
+        G_PluginLog.warn("resetFileAttributes not impl!! but ret true");
         return true;
     }
 
@@ -725,7 +725,7 @@ public:
         filename = TVPNormalizeStorageName(filename);
         TVPGetLocalName(filename);
 
-        TVPPluginLog().warn("getFileAttributes not impl!! ret 0");
+        G_PluginLog.warn("getFileAttributes not impl!! ret 0");
 
         return 0;
     }
@@ -742,7 +742,7 @@ public:
                                      iTJSDispatch2 *objthis) {
         if(numparams < 1)
             return TJS_E_BADPARAMCOUNT;
-        TVPPluginLog().warn("selectDirectory not implement yet");
+        G_PluginLog.warn("selectDirectory not implement yet");
         return TJS_S_OK;
     }
 

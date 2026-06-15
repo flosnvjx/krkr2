@@ -44,7 +44,7 @@ namespace TJS // following is in the namespace
         return t;
     }
 
-    void parser::error(const std::string &msg) { TVPTjs2Log().critical(msg); }
+    void parser::error(const std::string &msg) { G_Tjs2Log.critical(msg); }
 
     //---------------------------------------------------------------------------
     int _yyerror(const tjs_char *msg, tTJSScriptBlock *pm, tjs_int pos) {

@@ -1308,21 +1308,21 @@ namespace TJS {
             throw;
         } catch(eTJS &e) {
             if(tryCatch) {
-                TVPTjs2Log().debug(e.getMessage().AsStdString());
+                G_Tjs2Log.debug(e.getMessage().AsStdString());
             } else {
                 DisplayExceptionGeneratedCode(codesave - CodeArea, ra_org);
             }
             TJS_eTJSScriptError(e.getMessage(), this, codesave - CodeArea);
         } catch(exception &e) {
             if(tryCatch) {
-                TVPTjs2Log().debug(e.what());
+                G_Tjs2Log.debug(e.what());
             } else {
                 DisplayExceptionGeneratedCode(codesave - CodeArea, ra_org);
             }
             TJS_eTJSScriptError(e.what(), this, codesave - CodeArea);
         } catch(const char *text) {
             if(tryCatch) {
-                TVPTjs2Log().debug(text);
+                G_Tjs2Log.debug(text);
             } else {
                 DisplayExceptionGeneratedCode(codesave - CodeArea, ra_org);
             }

@@ -187,7 +187,7 @@ public:
                 encoding);
             _buffer = boost::locale::conv::utf_to_utf<char16_t>(wide);
         } catch(const std::exception &e) {
-            TVPCoreLog().error(e.what());
+            G_CoreLog.error(e.what());
             TVPThrowExceptionMessage(TJSNarrowToWideConversionError);
         }
     }

@@ -2532,14 +2532,14 @@ void LayerExDraw::getGlyphOutline(const FontInfo *fontInfo, PointF &offset,
         if(charcode < 0x20)
             return;
         // 不支持此字符
-        TVPPluginLog().error("not find Unicode >> {} << in FontFamily",
-                             ttstr{ (tjs_char)charcode }.AsNarrowStdString());
+        G_PluginLog.error("not find Unicode >> {} << in FontFamily",
+                          ttstr{ (tjs_char)charcode }.AsNarrowStdString());
     }
 
     FT_Int32 flags = FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP;
     if(FT_Load_Glyph(fontInfo->ftFace, glyphIndex, flags) != 0) {
         // 字形加载失败
-        TVPPluginLog().error("FT Load Glyph Failed!");
+        G_PluginLog.error("FT Load Glyph Failed!");
         return;
     }
 
@@ -2549,7 +2549,7 @@ void LayerExDraw::getGlyphOutline(const FontInfo *fontInfo, PointF &offset,
     // 字形格式检查
     if(glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
         // 非矢量字形，无法处理
-        TVPPluginLog().error("Not Vector Fonts Can't resolve!");
+        G_PluginLog.error("Not Vector Fonts Can't resolve!");
         return;
     }
 

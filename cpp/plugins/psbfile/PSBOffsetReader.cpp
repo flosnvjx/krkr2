@@ -60,7 +60,7 @@ namespace PSB {
             return false;
         }
         if(static_cast<PSBObjType>(typeByte) != PSBObjType::Objects) {
-            TVPPluginLog().warn("Invalidate Object at offset {}", objOffset);
+            G_PluginLog.warn("Invalidate Object at offset {}", objOffset);
             return false;
         }
         output.clear();
@@ -114,12 +114,11 @@ namespace PSB {
                 output = std::stoll(retStr);
                 return true;
             } catch(...) {
-                TVPPluginLog().warn("Invalidate Number at offset {}",
-                                    objOffset);
+                G_PluginLog.warn("Invalidate Number at offset {}", objOffset);
                 return false;
             }
         }
-        TVPPluginLog().warn("Invalidate Number at offset {}", objOffset);
+        G_PluginLog.warn("Invalidate Number at offset {}", objOffset);
         return false;
     }
 
@@ -136,11 +135,11 @@ namespace PSB {
                 output = std::stod(retStr);
                 return true;
             } catch(...) {
-                TVPPluginLog().warn("Invalidate Real at offset {}", objOffset);
+                G_PluginLog.warn("Invalidate Real at offset {}", objOffset);
                 return false;
             }
         }
-        TVPPluginLog().warn("Invalidate Real at offset {}", objOffset);
+        G_PluginLog.warn("Invalidate Real at offset {}", objOffset);
         return false;
     }
 
@@ -163,8 +162,7 @@ namespace PSB {
                 return true;
             }
             default:
-                TVPPluginLog().warn("Invalidate String at offset {}",
-                                    objOffset);
+                G_PluginLog.warn("Invalidate String at offset {}", objOffset);
                 return false;
         }
     }
@@ -177,7 +175,7 @@ namespace PSB {
             return false;
         }
         if(static_cast<PSBObjType>(typeByte) != PSBObjType::List) {
-            TVPPluginLog().warn("Invalidate List at offset {}", objOffset);
+            G_PluginLog.warn("Invalidate List at offset {}", objOffset);
             return false;
         }
         std::vector<std::uint32_t> objsOffset;
@@ -196,7 +194,7 @@ namespace PSB {
         if(readResourceIndex(type, _stream.get(), id)) {
             return true;
         }
-        TVPPluginLog().warn("Invalidate Resource at offset {}", objOffset);
+        G_PluginLog.warn("Invalidate Resource at offset {}", objOffset);
         return false;
     }
 
@@ -364,8 +362,7 @@ namespace PSB {
                 return result;
             }
             default:
-                TVPPluginLog().error("unknown psbObjType at offset {}",
-                                     objOffset);
+                G_PluginLog.error("unknown psbObjType at offset {}", objOffset);
                 return tTJSVariant();
         }
     }

@@ -124,12 +124,12 @@ bool TVPCheckIsVideoFile(const char *uri) {
     try {
         tTJSBinaryStream *rawStream = TVPCreateStream(uri, TJS_BS_READ);
         if(!rawStream) {
-            TVPCoreLog().error("TVPCreateStream returned nullptr for {}", uri);
+            G_CoreLog.error("TVPCreateStream returned nullptr for {}", uri);
             return false;
         }
         stream.reset(rawStream);
     } catch(eTJSError &e) {
-        TVPCoreLog().error("Error opening video file: {}", e.what());
+        G_CoreLog.error("Error opening video file: {}", e.what());
         return false;
     }
 

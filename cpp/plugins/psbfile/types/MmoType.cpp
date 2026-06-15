@@ -22,7 +22,7 @@ namespace PSB {
     MmoType::collectResources(const PSBFile &psb, bool deDuplication) {
         std::vector<std::unique_ptr<IResourceMetadata>> resourceList;
         // TODO:
-        TVPPluginLog().critical("TODO: MmoType::collectResources(...)");
+        G_PluginLog.critical("TODO: MmoType::collectResources(...)");
         return resourceList;
     }
 } // namespace PSB

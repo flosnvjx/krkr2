@@ -1,6 +1,5 @@
 #include "TVPLogLevelConfig.h"
 
-#include <cctype>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -134,7 +133,20 @@ namespace {
         };
         for(const char *name : kKnownLoggers)
             applySpdlogLoggerLevel(name);
+        const auto &config = filterConfig();
+        for(const auto &entry : config.categoryLevels)
+            applySpdlogLoggerLevel(entry.first.c_str());
+        for(const auto &name : config.disabledCategories)
+            applySpdlogLoggerLevel(name.c_str());
     }
+
+} // namespace
+
+void TVPApplySpdlogLoggerLevel(const char *category) {
+    applySpdlogLoggerLevel(category);
+}
+
+namespace {
 
     void parseLevelSpec(const char *spec, TVPLogLevel defaultMinLevel) {
         auto &config = filterConfig();

@@ -36,7 +36,7 @@ void TVPAppDelegate::applicationDidEnterBackground() {
 bool TVPAppDelegate::applicationDidFinishLaunching() {
     TVPMainThreadID = std::this_thread::get_id();
     TVPInitNativeDialogBackend();
-    TVPCoreLog().debug("App Finish Launching");
+    G_CoreLog.debug("App Finish Launching");
 
     // 文件选择 / 命令行启动会在 StartApplication 之前调用 TVPCheckArchive
     TVPInitEnvironFileBackends();

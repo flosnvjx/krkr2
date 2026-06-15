@@ -103,29 +103,41 @@ public:
     }
 };
 
-inline TVPCategoryLogger &TVPCoreLog() {
-    static TVPCategoryLogger logger("core");
-    return logger;
-}
+#define TVP_LOG_HANDLE_LEVEL(level)                                            \
+    void level(const std::string &message) const { cat().level(message); }     \
+    template <typename... Args>                                                \
+    void level(fmt::format_string<Args...> fmt, Args &&...args) const {        \
+        cat().level(fmt, std::forward<Args>(args)...);                         \
+    }
 
-inline TVPCategoryLogger &TVPTjs2Log() {
-    static TVPCategoryLogger logger("tjs2");
-    return logger;
-}
+// Lightweight handle — PluginLog.critical(...) vs TVPPluginLog().critical(...)
+template <auto Fn>
+struct TVPLogHandle {
+    TVP_LOG_HANDLE_LEVEL(trace)
+    TVP_LOG_HANDLE_LEVEL(debug)
+    TVP_LOG_HANDLE_LEVEL(info)
+    TVP_LOG_HANDLE_LEVEL(warn)
+    TVP_LOG_HANDLE_LEVEL(error)
+    TVP_LOG_HANDLE_LEVEL(critical)
+private:
+    [[nodiscard]] static decltype(auto) cat() { return Fn(); }
+};
 
-inline TVPCategoryLogger &TVPPluginLog() {
-    static TVPCategoryLogger logger("plugin");
-    return logger;
-}
+#undef TVP_LOG_HANDLE_LEVEL
 
-inline TVPCategoryLogger &TVPEngineLog() {
-    static TVPCategoryLogger logger("engine");
-    return logger;
-}
+// Define a custom log category (spdlog logger is created on first write).
+#define TVP_DEFINE_LOG_CATEGORY(CategoryName, category_string)                 \
+    inline TVPCategoryLogger(&TVP##CategoryName##Log()) {                      \
+        static TVPCategoryLogger logger(category_string);                      \
+        return logger;                                                         \
+    }                                                                          \
+    inline constexpr TVPLogHandle<(&TVP##CategoryName##Log)>                   \
+        G_##CategoryName##Log {}
 
-inline TVPCategoryLogger &TVPExceptionLog() {
-    static TVPCategoryLogger logger("exception");
-    return logger;
-}
+TVP_DEFINE_LOG_CATEGORY(Core, "core");
+TVP_DEFINE_LOG_CATEGORY(Tjs2, "tjs2");
+TVP_DEFINE_LOG_CATEGORY(Plugin, "plugin");
+TVP_DEFINE_LOG_CATEGORY(Engine, "engine");
+TVP_DEFINE_LOG_CATEGORY(Exception, "exception");
 
 #endif

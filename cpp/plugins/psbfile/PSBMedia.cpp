@@ -34,12 +34,12 @@ namespace PSB {
     }
 
     void PSBMedia::GetListAt(const ttstr &name, iTVPStorageLister *lister) {
-        TVPPluginLog().error("TODO: PSBMedia GetListAt");
+        G_PluginLog.error("TODO: PSBMedia GetListAt");
     }
 
     void PSBMedia::GetLocallyAccessibleName(ttstr &name) {
-        TVPPluginLog().error("can't get GetLocallyAccessibleName from {}!",
-                             name.AsStdString());
+        G_PluginLog.error("can't get GetLocallyAccessibleName from {}!",
+                          name.AsStdString());
     }
 
     void PSBMedia::add(const std::string &name,

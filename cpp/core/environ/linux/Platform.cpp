@@ -230,7 +230,7 @@ int TVPShowSimpleInputBox(ttstr &text, const ttstr &caption,
                           const ttstr &prompt,
                           const std::vector<ttstr> &vecButtons) {
     // TODO
-    TVPCoreLog().warn("linux platform simple input box not implement");
+    G_CoreLog.warn("linux platform simple input box not implement");
     return 0;
 }
 

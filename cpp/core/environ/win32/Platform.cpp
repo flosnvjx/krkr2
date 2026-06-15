@@ -400,7 +400,7 @@ bool TVP_utime(const char *name, time_t modtime) {
 int TVPShowSimpleInputBox(ttstr &text, const ttstr &caption,
                           const ttstr &prompt,
                           const std::vector<ttstr> &vecButtons) {
-    TVPCoreLog().warn("windows platform simple input box not implement");
+    G_CoreLog.warn("windows platform simple input box not implement");
     return 0;
 }
 

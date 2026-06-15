@@ -399,9 +399,9 @@ void TVPAddLog(const ttstr &line, bool appendtoimportant) {
         TVPLogStreamHolder.Log(buf);
 
     if(appendtoimportant)
-        TVPEngineLog().warn(line.AsStdString());
+        G_EngineLog.warn(line.AsStdString());
     else
-        TVPEngineLog().info(line.AsStdString());
+        G_EngineLog.info(line.AsStdString());
 }
 
 //---------------------------------------------------------------------------

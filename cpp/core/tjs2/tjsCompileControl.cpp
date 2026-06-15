@@ -28,7 +28,7 @@ namespace TJSPP {
         return n;
     }
 
-    void parser::error(const std::string &msg) { TVPTjs2Log().critical(msg); }
+    void parser::error(const std::string &msg) { G_Tjs2Log.critical(msg); }
     //---------------------------------------------------------------------------
     // TJS_iswspace
     static bool inline TJS_iswspace(tjs_char ch) {
