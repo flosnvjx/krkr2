@@ -12,7 +12,6 @@ enum class TVPLogInitLevel {
 struct TVPLoggingOptions {
     TVPLogInitLevel level = TVPLogInitLevel::Info;
     const char *pattern = nullptr;
-    bool plugin_logger = true;
     const char *log_level = nullptr;
 };
 

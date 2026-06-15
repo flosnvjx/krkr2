@@ -139,7 +139,6 @@ int main(int argc, char *argv[]) {
     TVPLoggingOptions log_options;
     log_options.level = TVPLogInitLevel::Debug;
     log_options.pattern = "%^%v%$";
-    log_options.plugin_logger = false;
     std::string loglevel_spec;
     if(program.is_used("--loglevel")) {
         loglevel_spec = program.get<std::string>("--loglevel");

@@ -109,8 +109,7 @@ void TVPEnsureSpdlogLoggers(const TVPLoggingOptions &options) {
 
     ensureNamedLogger("core");
     ensureNamedLogger("tjs2");
-    if(options.plugin_logger)
-        ensureNamedLogger("plugin");
+    ensureNamedLogger("plugin");
 
     spdlog::set_default_logger(spdlog::get("core"));
 }
